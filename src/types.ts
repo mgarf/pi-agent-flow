@@ -129,6 +129,8 @@ export interface SingleResult {
 	deadlineAtMs?: number;
 	/** Live in-progress text for status rendering; not part of the final flow report. */
 	streamingText?: string;
+	/** Accumulated thinking/reasoning text from thinking_delta events; stored for overlay/report display. */
+	thinkingText?: string;
 	/** Structured JSON output parsed from the flow's final response. */
 	structuredOutput?: FlowStructuredOutput;
 }
