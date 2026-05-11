@@ -157,6 +157,18 @@ export default function (pi: ExtensionAPI) {
 		description: "Maximum number of flows to execute in parallel (default: 4).",
 		type: "string",
 	});
+	pi.registerFlag("flow-lite-concurrency", {
+		description: "Max parallel flows for lite tier (scout, debug).",
+		type: "string",
+	});
+	pi.registerFlag("flow-flash-concurrency", {
+		description: "Max parallel flows for flash tier (build, audit).",
+		type: "string",
+	});
+	pi.registerFlag("flow-full-concurrency", {
+		description: "Max parallel flows for full tier (ideas, craft).",
+		type: "string",
+	});
 	pi.registerFlag("flow-session-mode", {
 		description: "Default child-flow session mode: fast (300s), default (600s), long (900s), or extreme_long (1200s).",
 		type: "string",
@@ -376,6 +388,7 @@ export default function (pi: ExtensionAPI) {
 						cwd: ctx.cwd,
 						loadedFlowModelConfigs: resolved.loadedFlowModelConfigs,
 						maxConcurrency: resolved.maxConcurrency,
+						tierConcurrency: resolved.tierConcurrency,
 
 						defaultSessionMode: resolved.defaultSessionMode,
 						signal,
@@ -421,8 +434,8 @@ export default function (pi: ExtensionAPI) {
 		discoverFlows: (cwd: string) => discoverFlows(cwd, "all"),
 		getFlowTier: (name: string) => getFlowTier(name),
 		getSettings: () => resolved
-			? { toolOptimize: resolved.toolOptimize, structuredOutput: resolved.structuredOutput, maxConcurrency: resolved.maxConcurrency }
-			: { toolOptimize: true, structuredOutput: true, maxConcurrency: 4 },
+			? { toolOptimize: resolved.toolOptimize, structuredOutput: resolved.structuredOutput, maxConcurrency: resolved.maxConcurrency, tierConcurrency: resolved.tierConcurrency }
+			: { toolOptimize: true, structuredOutput: true, maxConcurrency: 4, tierConcurrency: { lite: 4, flash: 4, full: 4 } },
 	};
 
 	if (typeof pi.emit === "function") {
