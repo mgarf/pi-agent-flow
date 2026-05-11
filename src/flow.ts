@@ -12,7 +12,7 @@ import * as path from "node:path";
 import type { AgentToolResult } from "@mariozechner/pi-agent-core";
 import { type FlowConfig } from "./agents.js";
 import { getInheritedCliArgs } from "./cli-args.js";
-import { processFlowJsonLine, drainStreamingText, drainStreamingEstimate, drainCtxEstimate, updateSmoothedTps, drainSmoothedTps } from "./runner-events.js";
+import { processFlowJsonLine, drainStreamingText, drainStreamingThinking, drainStreamingEstimate, drainCtxEstimate, updateSmoothedTps, drainSmoothedTps } from "./runner-events.js";
 import {
 	type SingleResult,
 	type FlowDetails,
@@ -446,11 +446,14 @@ export async function runFlow(opts: RunFlowOptions): Promise<SingleResult> {
 	};
 
 	let liveStreamingText = "";
+	let liveThinkingText = "";
 	let liveEstimatedOutputTokens = 0;
 	let lastActualOutputTokens = result.usage.output;
 	const emitUpdate = () => {
 		const streamingDelta = drainStreamingText(result);
 		if (streamingDelta) liveStreamingText += streamingDelta;
+		const thinkingDelta = drainStreamingThinking(result);
+		if (thinkingDelta) liveThinkingText += thinkingDelta;
 		const estimatedTokens = drainStreamingEstimate(result);
 		if (result.usage.output !== lastActualOutputTokens) {
 			lastActualOutputTokens = result.usage.output;
@@ -468,7 +471,7 @@ export async function runFlow(opts: RunFlowOptions): Promise<SingleResult> {
 					text: liveStreamingText || getFlowOutput(result.messages) || "(running...)",
 				},
 			],
-			details: makeDetails([{ ...result, usage: mergedUsage, streamingText: liveStreamingText || undefined }]),
+			details: makeDetails([{ ...result, usage: mergedUsage, streamingText: liveStreamingText || undefined, thinkingText: liveThinkingText || undefined }]),
 		});
 	};
 

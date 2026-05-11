@@ -16,6 +16,7 @@ const pendingTokensMap = new WeakMap<object, number>();
 const pauseAfterNextEmitMap = new WeakMap<object, boolean>();
 const ctxBaselineMap = new WeakMap<object, number>();
 const ctxStreamingCharsMap = new WeakMap<object, number>();
+const thinkingBufferMap = new WeakMap<object, string>();
 
 function getSeenFlowMessageSignatures(result: object): Set<string> {
 	if (!seenSignaturesMap.has(result)) {
@@ -54,6 +55,35 @@ export function drainStreamingText(result: object): string {
 	state.lastEmittedWordCount = 0;
 	return buf;
 }
+
+// ---------------------------------------------------------------------------
+// Thinking buffer
+// ---------------------------------------------------------------------------
+
+/**
+ * Accumulate a thinking delta into the thinking buffer.
+ * Returns true if the caller should emit an update.
+ */
+function accumulateStreamingThinkingDelta(result: object, delta: string): boolean {
+	if (!delta) return false;
+	if (!thinkingBufferMap.has(result)) {
+		thinkingBufferMap.set(result, "");
+	}
+	thinkingBufferMap.set(result, thinkingBufferMap.get(result)! + delta);
+	return true;
+}
+
+/**
+ * Drain the accumulated thinking buffer and return it.
+ */
+export function drainStreamingThinking(result: object): string {
+	if (!thinkingBufferMap.has(result)) return "";
+	const buf = thinkingBufferMap.get(result)!;
+	if (!buf) return "";
+	thinkingBufferMap.set(result, "");
+	return buf;
+}
+
 
 // ---------------------------------------------------------------------------
 // Streaming token estimate
@@ -446,10 +476,9 @@ function processFlowEvent(event: FlowEvent, result: FlowResult): boolean {
 			if (evt.type === "text_delta") {
 				return accumulateStreamingDelta(result, evt.delta ?? "");
 			}
-			// thinking_delta is intentionally NOT accumulated into the streaming buffer.
-			// Reasoning content is stripped from flow results to keep output clean.
+				// thinking_delta is accumulated into its own buffer for overlay/report display.
 			if (evt.type === "thinking_delta") {
-				return false;
+				return accumulateStreamingThinkingDelta(result, evt.delta ?? "");
 			}
 			return false;
 		}

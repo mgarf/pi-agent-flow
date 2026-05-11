@@ -6,6 +6,7 @@ import {
   drainCtxEstimate,
   updateSmoothedTps,
   drainSmoothedTps,
+  drainStreamingThinking,
   getFlowFinalText,
   getFlowSummaryText,
   stableStringify,
@@ -125,16 +126,17 @@ describe("processFlowJsonLine", () => {
     expect(drainStreamingText(r)).toBe("some text");
   });
 
-  it("handles thinking_delta — does not accumulate (reasoning stripped)", () => {
+  it("handles thinking_delta — accumulates into thinking buffer", () => {
     const r = makeResult();
     const event = {
       type: "message_update",
       assistantMessageEvent: { type: "thinking_delta", delta: "thinking..." },
     };
     const result = processFlowJsonLine(JSON.stringify(event), r);
-    expect(result).toBe(false);
-    // Thinking is stripped, so streaming buffer should be empty
+    expect(result).toBe(true);
+    // Thinking goes to its own buffer, not the streaming text buffer
     expect(drainStreamingText(r)).toBe("");
+    expect(drainStreamingThinking(r)).toBe("thinking...");
   });
 
   it("text_delta triggers emit immediately", () => {
