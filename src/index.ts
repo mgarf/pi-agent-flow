@@ -388,6 +388,10 @@ export default function (pi: ExtensionAPI) {
 								flowOutputs.set(key, entry);
 							}
 							entry.running = sr.exitCode === -1;
+							// Remove completed flows from the overlay map to prevent stale data and memory leaks
+							if (sr.exitCode !== -1) {
+								flowOutputs.delete(key);
+							}
 							if (sr.errorMessage) entry.errorMessage = sr.errorMessage;
 							if (sr.thinkingText) {
 								entry.transcript.push({ kind: "thinking" as const, text: sr.thinkingText });
@@ -512,6 +516,9 @@ export default function (pi: ExtensionAPI) {
 
 				// Clean up hotkey listener after flows complete
 				removeFlowOverlayListener?.();
+
+				// Clear the flow outputs map after all flows complete to prevent memory leaks
+				flowOutputs.clear();
 
 				// Clean up flow log directory
 				cleanupFlowLogDir(flowLogDir);
