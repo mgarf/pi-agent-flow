@@ -236,7 +236,7 @@ export class FlowFocusedView implements Component {
     }
 
     // Auto-scroll: show last N lines that fit the terminal
-    const maxRows = this.tui.terminal.rows - 6; // header + footer
+    const maxRows = Math.max(1, this.tui.terminal.rows - 6); // header + footer, clamped to avoid negative
     const visible = lines.slice(-maxRows);
     if (lines.length > maxRows) {
       visible.unshift(this.theme.fg("dim", `  ... ${lines.length - maxRows} lines above ...`));
