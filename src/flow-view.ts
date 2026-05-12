@@ -189,8 +189,8 @@ export class FlowFocusedView implements Component {
       this.dismiss();
       return;
     }
-    // Ctrl+O to re-pick a different flow
-    if (this.onRePick && matchesKey(decoded, Key.ctrl('o'))) {
+    // Ctrl+Alt+O to re-pick a different flow
+    if (this.onRePick && matchesKey(decoded, "ctrl+alt+o")) {
       this.onRePick();
       return;
     }
