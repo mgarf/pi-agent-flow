@@ -157,3 +157,19 @@ describe("mapFlowConcurrentByTier", () => {
 		expect(results).toEqual([0, 1]);
 	});
 });
+
+	it("throws or fails when tierOf returns an invalid tier", async () => {
+		const items = [
+			{ id: 0 },
+		];
+		// tierOf returns a string that is not "lite" | "flash" | "full"
+		const results = mapFlowConcurrentByTier(
+			items,
+			() => "invalid_tier" as any,
+			{ lite: 4, flash: 1, full: 1 },
+			4,
+			async (item) => item.id,
+		);
+		// Should reject because tierGates["invalid_tier"] is undefined
+		await expect(results).rejects.toThrow();
+	});
