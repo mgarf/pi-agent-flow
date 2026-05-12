@@ -5,12 +5,12 @@
  * Each flow receives a forked snapshot of the current session context.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { setupNotify } from "./notify.js";
 import { createFlowLogDir, cleanupFlowLogDir } from "./flow-log.js";
 import { FlowPicker, FlowFocusedView, type FlowOutputEntry } from "./flow-view.js";
-import { Key, matchesKey } from "@mariozechner/pi-tui";
+import { Key, matchesKey, type KeybindingsManager, type TUI } from "@mariozechner/pi-tui";
 import { discoverFlows, getFlowTier } from "./agents.js";
 import { getInheritedCliArgs } from "./cli-args.js";
 import { renderFlowCall, renderFlowResult } from "./render.js";
@@ -397,6 +397,80 @@ export default function (pi: ExtensionAPI) {
 					onUpdate?.(partial);
 				};
 
+				// --- TUI overlay: register Ctrl+Alt+O hotkey for live flow watching ---
+				let removeFlowOverlayListener: (() => void) | undefined;
+				if (ctx.hasUI && ctx.ui && typeof ctx.ui.onTerminalInput === "function") {
+					removeFlowOverlayListener = ctx.ui.onTerminalInput((data: string) => {
+						if (!matchesKey(data, "ctrl+alt+o")) return undefined;
+
+						// Build flow list from flowOutputs
+						const flowList: Array<{ key: string; type: string; aim: string; running: boolean }> = [];
+						for (const [key, entry] of flowOutputs) {
+							flowList.push({ key, type: entry.type, aim: entry.aim, running: entry.running });
+						}
+
+						if (flowList.length === 0) {
+							ctx.ui.notify?.("No active flows to watch", "info");
+							return { consume: true };
+						}
+
+						const overlayOpts = {
+							overlay: true,
+							overlayOptions: {
+								anchor: "center" as const,
+								width: "92%" as const,
+								minWidth: 60,
+								maxHeight: "85%",
+								margin: 1,
+							},
+						};
+
+						// Show FlowPicker
+						ctx.ui.custom(
+							(tui: TUI, theme: Theme, keybindings: KeybindingsManager, done: (key: string | null) => void) =>
+								new FlowPicker(flowList, tui, theme, keybindings, (selectedKey) => {
+									done(null);
+									if (!selectedKey) return;
+
+									const selectedEntry = flowOutputs.get(selectedKey);
+									if (!selectedEntry) return;
+
+									// Show FlowFocusedView for selected flow
+									ctx.ui.custom(
+										(tui2: TUI, theme2: Theme, kb2: KeybindingsManager, done2: (key: string | null) => void) =>
+											new FlowFocusedView(
+												selectedKey,
+												selectedEntry,
+												tui2,
+												theme2,
+												kb2,
+												() => done2(null),
+												() => {
+													done2(null);
+													// Re-show picker on Ctrl+O re-pick
+													const refreshedList: Array<{ key: string; type: string; aim: string; running: boolean }> = [];
+													for (const [k, e] of flowOutputs) {
+														refreshedList.push({ key: k, type: e.type, aim: e.aim, running: e.running });
+													}
+													if (refreshedList.length > 0) {
+														ctx.ui.custom(
+															(tui3: TUI, theme3: Theme, kb3: KeybindingsManager, done3: (key: string | null) => void) =>
+																new FlowPicker(refreshedList, tui3, theme3, kb3, done3),
+															overlayOpts,
+														);
+													}
+												},
+											),
+											overlayOpts,
+									);
+								}),
+							overlayOpts,
+						);
+
+						return { consume: true };
+					});
+				}
+
 				const result = await executeFlows(
 					{
 						flows,
@@ -430,6 +504,9 @@ export default function (pi: ExtensionAPI) {
 					params.flow.map((f: any) => ({ type: f.type, intent: f.intent, aim: f.aim, acceptance: f.acceptance, cwd: f.cwd, sessionMode: f.sessionMode })),
 					toolCallId,
 				);
+
+				// Clean up hotkey listener after flows complete
+				removeFlowOverlayListener?.();
 
 				const flowToolResult = {
 					content: result.content,
