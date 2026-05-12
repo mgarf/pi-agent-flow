@@ -93,6 +93,44 @@ describe('FlowPicker', () => {
     const picker = new FlowPicker(flows, tui, theme, keybindings, vi.fn());
     expect(picker.render(80).length).toBeGreaterThan(0);
   });
+
+  it('handles escape key via raw data', () => {
+    const flows = [{ key: 'scout#0', type: 'scout', aim: 'Test', running: true }];
+    const done = vi.fn();
+    const picker = new FlowPicker(flows, tui, theme, keybindings, done);
+    // ESC is \x1b — a non-printable key that decodeKittyPrintable would reject
+    picker.handleInput('\x1b');
+    expect(done).toHaveBeenCalledWith(null);
+  });
+
+  it('handles enter key via raw data', () => {
+    const flows = [{ key: 'scout#0', type: 'scout', aim: 'Test', running: true }];
+    const done = vi.fn();
+    const picker = new FlowPicker(flows, tui, theme, keybindings, done);
+    picker.handleInput('\n');
+    expect(done).toHaveBeenCalledWith('scout#0');
+  });
+
+  it('handles arrow up via raw data', () => {
+    const flows = [
+      { key: 'scout#0', type: 'scout', aim: 'First', running: true },
+      { key: 'build#1', type: 'build', aim: 'Second', running: false },
+    ];
+    const done = vi.fn();
+    const picker = new FlowPicker(flows, tui, theme, keybindings, done);
+    // Move down first, then up — arrow up is \x1b[A
+    picker.handleInput('\x1b[B'); // down
+    picker.handleInput('\x1b[A'); // up
+    expect(done).not.toHaveBeenCalled();
+  });
+
+  it('handles carriage return via raw data', () => {
+    const flows = [{ key: 'build#1', type: 'build', aim: 'Test', running: false }];
+    const done = vi.fn();
+    const picker = new FlowPicker(flows, tui, theme, keybindings, done);
+    picker.handleInput('\r');
+    expect(done).toHaveBeenCalledWith('build#1');
+  });
 });
 
 describe('FlowFocusedView', () => {
@@ -176,5 +214,22 @@ describe('FlowFocusedView', () => {
     const transcript = Array.from({ length: 30 }, (_, i) => ({ kind: 'output', text: 'Line ' + i }));
     const view = new FlowFocusedView('build#0', makeEntry({ transcript }), tui, theme, keybindings, vi.fn());
     expect(view.render(80).length).toBeGreaterThan(0);
+  });
+
+  it('handles escape key via raw data', () => {
+    const dismiss = vi.fn();
+    const view = new FlowFocusedView('build#0', makeEntry(), tui, theme, keybindings, dismiss);
+    // ESC is \x1b — a non-printable key that decodeKittyPrintable would reject
+    view.handleInput('\x1b');
+    expect(dismiss).toHaveBeenCalled();
+  });
+
+  it('handles ctrl+alt+o via raw data for re-pick', () => {
+    const dismiss = vi.fn();
+    const onRePick = vi.fn();
+    const view = new FlowFocusedView('build#0', makeEntry(), tui, theme, keybindings, dismiss, onRePick);
+    // Ctrl+Alt+O sends \x8f in Kitty protocol, or we can test with the literal string
+    view.handleInput('ctrl+alt+o');
+    expect(onRePick).toHaveBeenCalled();
   });
 });

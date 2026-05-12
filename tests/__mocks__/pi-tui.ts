@@ -91,7 +91,23 @@ export namespace Key {
 	export const tab = "tab";
 }
 
-export function matchesKey(_data: string, _key: string): boolean {
+export function matchesKey(data: string, key: string): boolean {
+	// Handle escape key: raw \x1b matches "escape"
+	if (key === "escape" && data === "\x1b") return true;
+	// Handle enter keys
+	if (key === "\n" && (data === "\n" || data === "\r")) return true;
+	if (key === "\r" && (data === "\n" || data === "\r")) return true;
+	// Handle arrow keys (CSI sequences)
+	if (key === "up" && data === "\x1b[A") return true;
+	if (key === "down" && data === "\x1b[B") return true;
+	if (key === "right" && data === "\x1b[C") return true;
+	if (key === "left" && data === "\x1b[D") return true;
+	// Handle literal key names (e.g. "ctrl+alt+o")
+	if (data === key) return true;
+	// Handle space key
+	if (key === "space" && data === " ") return true;
+	// Handle backspace
+	if (key === "backspace" && data === "\x7f") return true;
 	return false;
 }
 
