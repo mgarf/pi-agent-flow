@@ -103,11 +103,12 @@ describe('FlowPicker', () => {
     expect(done).toHaveBeenCalledWith(null);
   });
 
-  it('handles enter key via raw data', () => {
+  it('handles enter key via keybindings', () => {
     const flows = [{ key: 'scout#0', type: 'scout', aim: 'Test', running: true }];
     const done = vi.fn();
-    const picker = new FlowPicker(flows, tui, theme, keybindings, done);
-    picker.handleInput('\n');
+    const kb = { matches: vi.fn((_, name) => name === 'tui.select.confirm'), register: vi.fn(), unregister: vi.fn(), list: vi.fn(() => []) };
+    const picker = new FlowPicker(flows, tui, theme, kb, done);
+    picker.handleInput('enter');
     expect(done).toHaveBeenCalledWith('scout#0');
   });
 
@@ -124,11 +125,12 @@ describe('FlowPicker', () => {
     expect(done).not.toHaveBeenCalled();
   });
 
-  it('handles carriage return via raw data', () => {
+  it('handles confirm via keybindings (was carriage return)', () => {
     const flows = [{ key: 'build#1', type: 'build', aim: 'Test', running: false }];
     const done = vi.fn();
-    const picker = new FlowPicker(flows, tui, theme, keybindings, done);
-    picker.handleInput('\r');
+    const kb = { matches: vi.fn((_, name) => name === 'tui.select.confirm'), register: vi.fn(), unregister: vi.fn(), list: vi.fn(() => []) };
+    const picker = new FlowPicker(flows, tui, theme, kb, done);
+    picker.handleInput('enter');
     expect(done).toHaveBeenCalledWith('build#1');
   });
 });
