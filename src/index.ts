@@ -388,10 +388,6 @@ export default function (pi: ExtensionAPI) {
 								flowOutputs.set(key, entry);
 							}
 							entry.running = sr.exitCode === -1;
-							// Remove completed flows from the overlay map to prevent stale data and memory leaks
-							if (sr.exitCode !== -1) {
-								flowOutputs.delete(key);
-							}
 							if (sr.errorMessage) entry.errorMessage = sr.errorMessage;
 							if (sr.thinkingText) {
 								entry.transcript.push({ kind: "thinking" as const, text: sr.thinkingText });
@@ -400,6 +396,10 @@ export default function (pi: ExtensionAPI) {
 							if (sr.streamingText && !sr.thinkingText) {
 								entry.transcript.push({ kind: "output" as const, text: sr.streamingText });
 								writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "output", text: sr.streamingText });
+							}
+							// Remove completed flows from the overlay map after all transcript/log operations
+							if (sr.exitCode !== -1) {
+								flowOutputs.delete(key);
 							}
 						}
 					}

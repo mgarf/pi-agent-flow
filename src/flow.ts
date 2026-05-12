@@ -861,6 +861,11 @@ export async function mapFlowConcurrentByTier<TIn, TOut>(
 			const item = items[i];
 			const tier = tierOf(item);
 
+			// Validate tier before accessing the gate map
+			if (tier !== 'lite' && tier !== 'flash' && tier !== 'full') {
+				throw new Error(`Invalid flow tier '${tier}' for item at index ${i}. Expected 'lite', 'flash', or 'full'.`);
+			}
+
 			// Acquire both: tier gate + global gate
 			await Promise.all([
 				tierGates[tier].acquire(),
