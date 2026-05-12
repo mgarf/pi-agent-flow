@@ -8,7 +8,7 @@
 import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { setupNotify } from "./notify.js";
-import { createFlowLogDir, cleanupFlowLogDir } from "./flow-log.js";
+import { createFlowLogDir, cleanupFlowLogDir, writeFlowLogEntry } from "./flow-log.js";
 import { FlowPicker, FlowFocusedView, type FlowOutputEntry } from "./flow-view.js";
 import { Key, matchesKey, type KeybindingsManager, type TUI } from "@mariozechner/pi-tui";
 import { discoverFlows, getFlowTier } from "./agents.js";
@@ -362,6 +362,9 @@ export default function (pi: ExtensionAPI) {
 				// Track per-flow outputs for TUI overlay consumption
 				const flowOutputs = new Map<string, FlowOutputEntry>();
 
+				// Create shared log directory for this flow tool invocation
+				const flowLogDir = createFlowLogDir();
+
 				const wrappedOnUpdate = (
 					partial: import("@mariozechner/pi-agent-core").AgentToolResult<FlowDetails>,
 				): void => {
@@ -388,9 +391,11 @@ export default function (pi: ExtensionAPI) {
 							if (sr.errorMessage) entry.errorMessage = sr.errorMessage;
 							if (sr.thinkingText) {
 								entry.transcript.push({ kind: "thinking" as const, text: sr.thinkingText });
+								writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "thinking", text: sr.thinkingText });
 							}
 							if (sr.streamingText && !sr.thinkingText) {
 								entry.transcript.push({ kind: "output" as const, text: sr.streamingText });
+								writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "output", text: sr.streamingText });
 							}
 						}
 					}
@@ -507,6 +512,9 @@ export default function (pi: ExtensionAPI) {
 
 				// Clean up hotkey listener after flows complete
 				removeFlowOverlayListener?.();
+
+				// Clean up flow log directory
+				cleanupFlowLogDir(flowLogDir);
 
 				const flowToolResult = {
 					content: result.content,
