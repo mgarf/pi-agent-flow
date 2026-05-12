@@ -10,7 +10,6 @@ import type { Theme } from "@mariozechner/pi-coding-agent";
 import {
   Container,
   type Component,
-  decodeKittyPrintable,
   Key,
   type KeybindingsManager,
   matchesKey,
@@ -79,26 +78,23 @@ export class FlowPicker implements Component {
   }
 
   handleInput(data: string): void {
-    const decoded = decodeKittyPrintable(data);
-    if (!decoded) return;
-
-    if (matchesKey(decoded, Key.escape)) {
+    if (matchesKey(data, Key.escape)) {
       this.done(null);
       return;
     }
-    if (this.keybindings.matches(decoded, "tui.select.up") || matchesKey(decoded, "k")) {
+    if (this.keybindings.matches(data, "tui.select.up") || matchesKey(data, "k")) {
       this.selectedIndex = Math.max(0, this.selectedIndex - 1);
       this.buildContent();
       this.container.invalidate();
       return;
     }
-    if (this.keybindings.matches(decoded, "tui.select.down") || matchesKey(decoded, "j")) {
+    if (this.keybindings.matches(data, "tui.select.down") || matchesKey(data, "j")) {
       this.selectedIndex = Math.min(this.flows.length - 1, this.selectedIndex + 1);
       this.buildContent();
       this.container.invalidate();
       return;
     }
-    if (matchesKey(decoded, "\n") || matchesKey(decoded, "\r")) {
+    if (matchesKey(data, "\n") || matchesKey(data, "\r")) {
       this.done(this.flows[this.selectedIndex]?.key ?? null);
       return;
     }
@@ -182,15 +178,12 @@ export class FlowFocusedView implements Component {
   }
 
   handleInput(data: string): void {
-    const decoded = decodeKittyPrintable(data);
-    if (!decoded) return;
-
-    if (matchesKey(decoded, Key.escape)) {
+    if (matchesKey(data, Key.escape)) {
       this.dismiss();
       return;
     }
     // Ctrl+Alt+O to re-pick a different flow
-    if (this.onRePick && matchesKey(decoded, "ctrl+alt+o")) {
+    if (this.onRePick && matchesKey(data, "ctrl+alt+o")) {
       this.onRePick();
       return;
     }

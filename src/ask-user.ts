@@ -1648,6 +1648,11 @@ export function createAskUserTool() {
                && typeof ctx.ui.onTerminalInput === "function"
             ) {
                removeOverlayInputListener = ctx.ui.onTerminalInput((data: string) => {
+                  // Escape key dismisses the overlay as a failsafe
+                  if (matchesKey(data, Key.escape) && overlayHandle && !overlayHandle.isHidden()) {
+                     overlayHandle.setHidden(true);
+                     return { consume: true };
+                  }
                   if (!overlayToggle.matches(data) || !overlayHandle) return undefined;
                   const nextHidden = !overlayHandle.isHidden();
                   overlayHandle.setHidden(nextHidden);
