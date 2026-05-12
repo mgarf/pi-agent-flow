@@ -94,7 +94,7 @@ export class FlowPicker implements Component {
       this.container.invalidate();
       return;
     }
-    if (matchesKey(data, "\n") || matchesKey(data, "\r")) {
+    if (this.keybindings.matches(data, "tui.select.confirm")) {
       this.done(this.flows[this.selectedIndex]?.key ?? null);
       return;
     }
