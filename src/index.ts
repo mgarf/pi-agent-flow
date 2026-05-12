@@ -8,6 +8,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { setupNotify } from "./notify.js";
+import { createFlowLogDir, cleanupFlowLogDir } from "./flow-log.js";
+import { FlowPicker, FlowFocusedView, type FlowOutputEntry } from "./flow-view.js";
+import { Key, matchesKey } from "@mariozechner/pi-tui";
 import { discoverFlows, getFlowTier } from "./agents.js";
 import { getInheritedCliArgs } from "./cli-args.js";
 import { renderFlowCall, renderFlowResult } from "./render.js";
@@ -356,6 +359,44 @@ export default function (pi: ExtensionAPI) {
 					return typeof inheritedValue === "string" && inheritedValue.trim() ? inheritedValue.trim() : undefined;
 				};
 
+				// Track per-flow outputs for TUI overlay consumption
+				const flowOutputs = new Map<string, FlowOutputEntry>();
+
+				const wrappedOnUpdate = (
+					partial: import("@mariozechner/pi-agent-core").AgentToolResult<FlowDetails>,
+				): void => {
+					// Populate flowOutputs from streaming partial results
+					if (partial.details?.results) {
+						for (let i = 0; i < partial.details.results.length; i++) {
+							const sr = partial.details.results[i];
+							if (!sr) continue;
+							const key = `${sr.type}#${i}`;
+							let entry = flowOutputs.get(key);
+							if (!entry) {
+								entry = {
+									type: sr.type || "unknown",
+									aim: sr.aim || "",
+									running: sr.exitCode === -1,
+									transcript: [],
+									streamingThinking: "",
+									streamingOutput: "",
+									errorMessage: sr.errorMessage,
+								};
+								flowOutputs.set(key, entry);
+							}
+							entry.running = sr.exitCode === -1;
+							if (sr.errorMessage) entry.errorMessage = sr.errorMessage;
+							if (sr.thinkingText) {
+								entry.transcript.push({ kind: "thinking" as const, text: sr.thinkingText });
+							}
+							if (sr.streamingText && !sr.thinkingText) {
+								entry.transcript.push({ kind: "output" as const, text: sr.streamingText });
+							}
+						}
+					}
+					onUpdate?.(partial);
+				};
+
 				const result = await executeFlows(
 					{
 						flows,
@@ -372,7 +413,7 @@ export default function (pi: ExtensionAPI) {
 
 						defaultSessionMode: resolved.defaultSessionMode,
 						signal,
-						onUpdate,
+						onUpdate: wrappedOnUpdate,
 						makeDetails,
 						getFlag: (name: string) => name === "flow-mode" ? resolved!.activeRuntimeFlowMode : pi.getFlag(name),
 						tierOverrideResolver: getTierOverride,

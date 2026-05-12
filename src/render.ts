@@ -297,6 +297,13 @@ function renderFlowExpanded(
 		container.addChild(new Text(theme.fg("muted", summary), 0, 0));
 	}
 
+	// Agent thinking (expanded only)
+	if (r.thinkingText) {
+		container.addChild(new Spacer(1));
+		container.addChild(new Text(theme.fg("muted", sectionHeader("agent thinking")), 0, 0));
+		container.addChild(new Text(theme.fg("dim", r.thinkingText), 0, 0));
+	}
+
 	// Tool traces (expanded only)
 	const toolTraces = renderToolTraces(displayItems, theme);
 	if (toolTraces) {
