@@ -30,7 +30,7 @@ describe("runFlow case-insensitive lookup", () => {
 		proc.stdout = new EventEmitter();
 		proc.stderr = new EventEmitter();
 		proc.pid = 12345;
-		proc.kill = vi.fn();
+		proc.kill = vi.fn(); proc.unref = vi.fn(); proc.unref = vi.fn();
 		return proc;
 	}
 
@@ -119,6 +119,7 @@ describe("runFlow case-insensitive lookup", () => {
 		const updates: string[] = [];
 		const outputUpdates: number[] = [];
 		const detailStreamingText: Array<string | undefined> = [];
+		const detailStreamingTextThinking: Array<string | undefined> = [];
 
 		const opts: RunFlowOptions = {
 			cwd: "/tmp",
@@ -135,6 +136,7 @@ describe("runFlow case-insensitive lookup", () => {
 				updates.push(partial.content[0]?.text || "");
 				outputUpdates.push(partial.details?.results[0]?.usage.output ?? 0);
 				detailStreamingText.push(partial.details?.results[0]?.streamingText);
+				detailStreamingTextThinking.push(partial.details?.results[0]?.thinkingText);
 			},
 			makeDetails: (results) => ({
 				mode: "flow",
@@ -148,6 +150,8 @@ describe("runFlow case-insensitive lookup", () => {
 		setTimeout(() => {
 			mockProc.stdout.emit("data", Buffer.from('{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"Hel"}}\n'));
 			mockProc.stdout.emit("data", Buffer.from('{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"lo"}}\n'));
+			mockProc.stdout.emit("data", Buffer.from('{"type":"message_update","assistantMessageEvent":{"type":"thinking_delta","delta":"Thinking "}}\n'));
+			mockProc.stdout.emit("data", Buffer.from('{"type":"message_update","assistantMessageEvent":{"type":"thinking_delta","delta":"is hard"}}\n'));
 			mockProc.emit("close", 0);
 		}, 10);
 
@@ -155,6 +159,7 @@ describe("runFlow case-insensitive lookup", () => {
 		expect(updates).toEqual(["Hel", "Hello"]);
 		expect(outputUpdates).toEqual([0, 1]);
 		expect(detailStreamingText).toEqual(["Hel", "Hello"]);
+		expect(detailStreamingTextThinking).toEqual(["Thinking ", "Thinking is hard"]);
 	});
 
 	it("accumulates estimated output tokens across streaming updates", async () => {
@@ -306,7 +311,7 @@ describe("agent_end grace period behavior", () => {
 		proc.stdout = new EventEmitter();
 		proc.stderr = new EventEmitter();
 		proc.pid = 12345;
-		proc.kill = vi.fn();
+		proc.kill = vi.fn(); proc.unref = vi.fn(); proc.unref = vi.fn();
 		return proc;
 	}
 
@@ -405,7 +410,7 @@ describe("child flow harness tools", () => {
 		proc.stdout = new EventEmitter();
 		proc.stderr = new EventEmitter();
 		proc.pid = 12345;
-		proc.kill = vi.fn();
+		proc.kill = vi.fn(); proc.unref = vi.fn(); proc.unref = vi.fn();
 		return proc;
 	}
 
@@ -809,7 +814,7 @@ describe("PI_FLOW_SPAWN_COMMAND env override", () => {
 		proc.stdout = new EventEmitter();
 		proc.stderr = new EventEmitter();
 		proc.pid = 12345;
-		proc.kill = vi.fn();
+		proc.kill = vi.fn(); proc.unref = vi.fn(); proc.unref = vi.fn();
 		return proc;
 	}
 
@@ -863,7 +868,7 @@ describe("timeout two-stage behavior", () => {
 		proc.stdout = new EventEmitter();
 		proc.stderr = new EventEmitter();
 		proc.pid = 12345;
-		proc.kill = vi.fn();
+		proc.kill = vi.fn(); proc.unref = vi.fn(); proc.unref = vi.fn();
 		return proc;
 	}
 
@@ -1068,7 +1073,7 @@ describe("acceptance field propagation", () => {
 		proc.stdout = new EventEmitter();
 		proc.stderr = new EventEmitter();
 		proc.pid = 12345;
-		proc.kill = vi.fn();
+		proc.kill = vi.fn(); proc.unref = vi.fn(); proc.unref = vi.fn();
 		return proc;
 	}
 
