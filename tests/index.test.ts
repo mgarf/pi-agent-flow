@@ -1240,7 +1240,7 @@ describe("main agent tool restriction", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("restricts main agent to batch_read+flow+web+ask_user when toolOptimize is true", async () => {
+	it("merges existing tools with flow tools when toolOptimize is true", async () => {
 		process.env.PI_FLOW_TOOL_OPTIMIZE = "1";
 
 		const pi = createMockPi();
@@ -1250,10 +1250,21 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalled();
 		const calledWith = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(calledWith).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(calledWith).toContain("bash");
+		expect(calledWith).toContain("find");
+		expect(calledWith).toContain("grep");
+		expect(calledWith).toContain("ls");
+		expect(calledWith).toContain("flow");
+		expect(calledWith).toContain("web");
+		expect(calledWith).toContain("ask_user");
+		expect(calledWith).toContain("batch_read");
+		expect(calledWith).not.toContain("read");
+		expect(calledWith).not.toContain("write");
+		expect(calledWith).not.toContain("edit");
+		expect(calledWith).not.toContain("batch");
 	});
 
-	it("restores legacy read+write+edit+batch when toolOptimize is false", async () => {
+	it("merges existing tools without read/write/edit/batch when toolOptimize is false", async () => {
 		process.env.PI_FLOW_TOOL_OPTIMIZE = "0";
 
 		const pi = createMockPi();
@@ -1263,13 +1274,18 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalled();
 		const calledWith = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(calledWith).toContain("read");
-		expect(calledWith).toContain("write");
-		expect(calledWith).toContain("edit");
-		expect(calledWith).toContain("batch");
 		expect(calledWith).toContain("bash");
+		expect(calledWith).toContain("find");
+		expect(calledWith).toContain("grep");
+		expect(calledWith).toContain("ls");
 		expect(calledWith).toContain("flow");
 		expect(calledWith).toContain("web");
+		expect(calledWith).toContain("ask_user");
+		expect(calledWith).not.toContain("read");
+		expect(calledWith).not.toContain("write");
+		expect(calledWith).not.toContain("edit");
+		expect(calledWith).not.toContain("batch");
+		expect(calledWith).not.toContain("batch_read");
 	});
 
 	it("defers setActiveTools to session_start, not extension loading", async () => {
@@ -1287,7 +1303,7 @@ describe("main agent tool restriction", () => {
 		expect(pi.setActiveTools).toHaveBeenCalled();
 	});
 
-	it("re-applies batch_read+flow+web on turn_start when optimized", async () => {
+	it("re-applies merged tools on turn_start when optimized", async () => {
 		process.env.PI_FLOW_TOOL_OPTIMIZE = "1";
 
 		const pi = createMockPi();
@@ -1301,10 +1317,17 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalledTimes(afterSession + 1);
 		const lastCall = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls.at(-1)[0];
-		expect(lastCall).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(lastCall).toContain("batch_read");
+		expect(lastCall).toContain("flow");
+		expect(lastCall).toContain("web");
+		expect(lastCall).toContain("ask_user");
+		expect(lastCall).not.toContain("read");
+		expect(lastCall).not.toContain("write");
+		expect(lastCall).not.toContain("edit");
+		expect(lastCall).not.toContain("batch");
 	});
 
-	it("restores legacy+batch tools on turn_start when toolOptimize is false", async () => {
+	it("re-applies merged tools on turn_start when toolOptimize is false", async () => {
 		process.env.PI_FLOW_TOOL_OPTIMIZE = "0";
 
 		const pi = createMockPi();
@@ -1317,13 +1340,14 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalledTimes(afterSession + 1);
 		const lastCall = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls.at(-1)[0];
-		expect(lastCall).toContain("read");
-		expect(lastCall).toContain("write");
-		expect(lastCall).toContain("edit");
-		expect(lastCall).toContain("batch");
 		expect(lastCall).toContain("bash");
 		expect(lastCall).toContain("flow");
 		expect(lastCall).toContain("web");
+		expect(lastCall).toContain("ask_user");
+		expect(lastCall).not.toContain("read");
+		expect(lastCall).not.toContain("write");
+		expect(lastCall).not.toContain("edit");
+		expect(lastCall).not.toContain("batch");
 	});
 
 	it("parses env PI_FLOW_TOOL_OPTIMIZE via parseBoolean (yes/on/no/off)", async () => {
@@ -1336,7 +1360,14 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalled();
 		const calledWith = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(calledWith).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(calledWith).toContain("batch_read");
+		expect(calledWith).toContain("flow");
+		expect(calledWith).toContain("web");
+		expect(calledWith).toContain("ask_user");
+		expect(calledWith).not.toContain("read");
+		expect(calledWith).not.toContain("write");
+		expect(calledWith).not.toContain("edit");
+		expect(calledWith).not.toContain("batch");
 	});
 
 	it("registers batch_read for main agent; batch/batch_bash_poll reserved for children", async () => {
@@ -1353,9 +1384,16 @@ describe("main agent tool restriction", () => {
 		expect(pi.getTool("batch_bash_poll")).toBeUndefined();
 		expect(pi.getTool("bash")).toBeUndefined();
 
-		// Main agent active tools: batch_read + flow + web + ask_user (batch and batch_bash_poll registered but not active)
+		// Main agent active tools include flow tools + third-party tools, no read/write/edit/batch
 		const lastCall = pi.setActiveTools.mock.calls[pi.setActiveTools.mock.calls.length - 1][0];
-		expect(lastCall).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(lastCall).toContain("batch_read");
+		expect(lastCall).toContain("flow");
+		expect(lastCall).toContain("web");
+		expect(lastCall).toContain("ask_user");
+		expect(lastCall).not.toContain("read");
+		expect(lastCall).not.toContain("write");
+		expect(lastCall).not.toContain("edit");
+		expect(lastCall).not.toContain("batch");
 	});
 
 	it("does NOT override active tools for child flows (depth > 0)", async () => {

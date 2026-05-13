@@ -35,6 +35,7 @@ export interface ResolvedSettings {
 	structuredOutput: boolean;
 	maxConcurrency: number;
 	defaultSessionMode: AgentSessionMode;
+	excludeTools: string[];
 	discoveredFlows: FlowConfig[];
 	loadedFlowModelConfigs: LoadedFlowModelConfigs;
 	activeRuntimeFlowMode: string | undefined;
@@ -112,6 +113,7 @@ export function resolveSettings(
 	if (typeof flowSettings.maxConcurrency === "number") {
 		maxConcurrency = flowSettings.maxConcurrency;
 	}
+	const excludeTools: string[] = flowSettings.excludeTools ?? [];
 
 	// Resolve toolOptimize: CLI flag > env var > settings.json > default
 	const cliFlag = pi.getFlag("tool-optimize");
@@ -176,6 +178,7 @@ export function resolveSettings(
 		structuredOutput,
 		maxConcurrency,
 		defaultSessionMode,
+		excludeTools,
 		discoveredFlows,
 		loadedFlowModelConfigs,
 		activeRuntimeFlowMode,

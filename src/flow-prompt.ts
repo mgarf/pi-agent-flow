@@ -24,10 +24,56 @@ export interface BeforeAgentStartEvent {
 // Active tools helper
 // ---------------------------------------------------------------------------
 
-export function computeActiveTools(optimize: boolean): string[] {
-	return optimize
-		? ["batch_read", "flow", "web", "ask_user"]
-		: ["read", "write", "edit", "batch", "bash", "flow", "web", "ask_user"];
+/**
+ * Compute the active tool list for a session.
+ *
+ * Strategy:
+ *   1. Start with existing tools from the platform (pi.getActiveTools())
+ *   2. Remove always-excluded tools: read, write, edit, batch
+ *   3. In optimize mode, also exclude bash
+ *   4. Remove user-configured excludeTools
+ *   5. Add pi-agent-flow tools: flow, web, ask_user
+ *   6. In optimize mode, also add batch_read
+ *
+ * This allows third-party plugins (memory, skill, etc.) to survive setActiveTools.
+ */
+const ALWAYS_EXCLUDED = new Set(["read", "write", "edit", "batch"]);
+const FLOW_TOOLS = new Set(["flow", "web", "ask_user"]);
+
+export function computeActiveTools(
+	existingTools: string[],
+	excludeTools: string[],
+	optimize: boolean,
+): string[] {
+	const excluded = new Set(ALWAYS_EXCLUDED);
+
+	// Optimize mode: also exclude bash (no shell access for fast/cheap runs)
+	if (optimize) {
+		excluded.add("bash");
+	}
+
+	for (const t of excludeTools) {
+		excluded.add(t.toLowerCase());
+	}
+
+	const tools = new Set<string>();
+	for (const t of existingTools) {
+		if (!excluded.has(t.toLowerCase())) {
+			tools.add(t);
+		}
+	}
+
+	// Add pi-agent-flow tools
+	for (const t of FLOW_TOOLS) {
+		tools.add(t);
+	}
+
+	// Optimize mode: add batch_read
+	if (optimize) {
+		tools.add("batch_read");
+	}
+
+	return [...tools].sort();
 }
 
 // ---------------------------------------------------------------------------
