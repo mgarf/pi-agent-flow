@@ -9,7 +9,6 @@ import {
 	looksLikeUrlPrompt,
 	looksLikeWebSearchPrompt,
 } from "./web-tool.js";
-import { SLIDING_PROMPT } from "./sliding-prompt.js";
 import type { FlowDepthConfig } from "./depth.js";
 
 // ---------------------------------------------------------------------------
@@ -25,10 +24,56 @@ export interface BeforeAgentStartEvent {
 // Active tools helper
 // ---------------------------------------------------------------------------
 
-export function computeActiveTools(optimize: boolean): string[] {
-	return optimize
-		? ["batch_read", "flow", "web", "ask_user", "memory_search", "session_search", "memory", "skill"]
-		: ["read", "write", "edit", "batch", "bash", "flow", "web", "ask_user", "memory_search", "session_search", "memory", "skill"];
+/**
+ * Compute the active tool list for a session.
+ *
+ * Strategy:
+ *   1. Start with existing tools from the platform (pi.getActiveTools())
+ *   2. Remove always-excluded tools: read, write, edit, batch
+ *   3. In optimize mode, also exclude bash
+ *   4. Remove user-configured excludeTools
+ *   5. Add pi-agent-flow tools: flow, web, ask_user
+ *   6. In optimize mode, also add batch_read
+ *
+ * This allows third-party plugins (memory, skill, etc.) to survive setActiveTools.
+ */
+const ALWAYS_EXCLUDED = new Set(["read", "write", "edit", "batch"]);
+const FLOW_TOOLS = new Set(["flow", "web", "ask_user"]);
+
+export function computeActiveTools(
+	existingTools: string[],
+	excludeTools: string[],
+	optimize: boolean,
+): string[] {
+	const excluded = new Set(ALWAYS_EXCLUDED);
+
+	// Optimize mode: also exclude bash (no shell access for fast/cheap runs)
+	if (optimize) {
+		excluded.add("bash");
+	}
+
+	for (const t of excludeTools) {
+		excluded.add(t.toLowerCase());
+	}
+
+	const tools = new Set<string>();
+	for (const t of existingTools) {
+		if (!excluded.has(t.toLowerCase())) {
+			tools.add(t);
+		}
+	}
+
+	// Add pi-agent-flow tools
+	for (const t of FLOW_TOOLS) {
+		tools.add(t);
+	}
+
+	// Optimize mode: add batch_read
+	if (optimize) {
+		tools.add("batch_read");
+	}
+
+	return [...tools].sort();
 }
 
 // ---------------------------------------------------------------------------
@@ -38,8 +83,9 @@ export function computeActiveTools(optimize: boolean): string[] {
 /**
  * Build the before_agent_start system prompt augmentation.
  *
- * Adds web steering (when tool optimize is off), sliding prompt,
- * and the flow delegation guide with guard info.
+ * Adds web steering (when tool optimize is off) and the flow delegation
+ * guide with guard info. The steering hint is NOT included here — it
+ * is injected dynamically by the context hook in index.ts.
  *
  * Returns the augmented systemPrompt, or undefined if the child flow
  * should skip this handler.
@@ -75,9 +121,6 @@ export function buildBeforeAgentStartPrompt(
 			"\n\n## pi-web steering\n" +
 			webInstructions.map((line) => `- ${line}`).join("\n");
 	}
-
-	// Append sliding prompt to static system prompt unconditionally.
-	systemPrompt += "\n\n" + SLIDING_PROMPT;
 
 	if (!canDelegate || discoveredFlows.length === 0) {
 		return systemPrompt;

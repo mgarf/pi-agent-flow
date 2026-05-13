@@ -43,6 +43,9 @@ export interface FlowSettings {
 		flash?: number;
 		full?: number;
 	};
+
+	/** Additional tools to exclude from the main agent session beyond the defaults (read, write, edit, batch). */
+	excludeTools?: string[];
 }
 
 const BUILTIN_FLOW_MODEL_CONFIGS: FlowModelConfigs = {
@@ -258,6 +261,19 @@ function extractFlowSettings(settings: Record<string, unknown> | null): FlowSett
 		}
 	}
 
+
+	const rawExcludeTools = obj.excludeTools;
+	if (Array.isArray(rawExcludeTools)) {
+		const filtered: string[] = [];
+		for (const item of rawExcludeTools) {
+			if (typeof item === "string" && item.trim()) {
+				filtered.push(item.trim());
+			}
+		}
+		if (filtered.length > 0) {
+			result.excludeTools = filtered;
+		}
+	}
 	return result;
 }
 

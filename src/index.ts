@@ -199,7 +199,7 @@ export default function (pi: ExtensionAPI) {
 		// Child flows (depth > 0) receive their tools via --tools CLI arg;
 		// overriding them here would strip bash/batch from children.
 		if (currentDepth === 0) {
-			pi.setActiveTools(computeActiveTools(resolved.toolOptimize));
+			pi.setActiveTools(computeActiveTools(pi.getActiveTools(), resolved.excludeTools, resolved.toolOptimize));
 		}
 
 		// Register tools based on depth.
@@ -233,7 +233,7 @@ export default function (pi: ExtensionAPI) {
 	// Skip for child flows — they get tools from --tools CLI arg.
 	pi.on("turn_start", () => {
 		if (currentDepth > 0 || !resolved) return;
-		pi.setActiveTools(computeActiveTools(resolved.toolOptimize));
+		pi.setActiveTools(computeActiveTools(pi.getActiveTools(), resolved.excludeTools, resolved.toolOptimize));
 		resetStrategicHintTracker();
 	});
 
