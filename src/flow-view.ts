@@ -273,7 +273,7 @@ export class FlowFocusedView implements Component {
       return;
     }
     // Scroll up
-    if (this.keybindings.matches(data, "tui.select.up") || matchesKey(data, "k")) {
+    if (this.keybindings.matches(data, "tui.select.up") || matchesKey(data, "k") || matchesKey(data, "up")) {
       if (this.scrollOffset < this.maxScroll) {
         this.scrollOffset++;
         const w = this.lastRenderWidth || Math.max(1, (process.stdout.columns ?? 80) - BOX_BORDER_OVERHEAD);
@@ -283,7 +283,7 @@ export class FlowFocusedView implements Component {
       return;
     }
     // Scroll down
-    if (this.keybindings.matches(data, "tui.select.down") || matchesKey(data, "j")) {
+    if (this.keybindings.matches(data, "tui.select.down") || matchesKey(data, "j") || matchesKey(data, "down")) {
       if (this.scrollOffset > 0) {
         this.scrollOffset--;
         const w = this.lastRenderWidth || Math.max(1, (process.stdout.columns ?? 80) - BOX_BORDER_OVERHEAD);
@@ -314,7 +314,7 @@ export class FlowFocusedView implements Component {
 
     // Build full transcript (completed entries + streaming)
     const lines: string[] = [];
-    const separator = this.theme.fg("dim", "─".repeat(Math.max(0, width - 2)));
+    const separator = this.theme.fg("dim", "─".repeat(Math.max(0, width)));
 
     // Group thinking and output into sections for cleaner rendering
     let lastKind: "thinking" | "output" | null = null;
@@ -333,7 +333,7 @@ export class FlowFocusedView implements Component {
       const wrapped = wrapTextWithAnsi(text, Math.max(1, width - 2));
       lines.push(...wrapped.map((l) => {
         const colored = `  ${colorFn(l)}`;
-        return truncateToWidth(colored, width - 2, " ", true);
+        return truncateToWidth(colored, width, " ", true);
       }));
       lastKind = kind;
     };
@@ -351,7 +351,9 @@ export class FlowFocusedView implements Component {
     // Apply scroll offset: slice from the scrolled position
     // Reserve 1 row for scroll indicator when scrolled, so slice maxRows - 1
     const indicatorSpace = this.scrollOffset > 0 ? 1 : 0;
-    const sliceCount = Math.max(1, maxRows - indicatorSpace);
+    const linesAboveVisible = (lines.length > maxRows && this.scrollOffset === 0) ? 1 : 0;
+    const reservedLines = indicatorSpace + linesAboveVisible;
+    const sliceCount = Math.max(1, maxRows - reservedLines);
     const baseSlice = lines.slice(-(sliceCount + this.scrollOffset), -this.scrollOffset || undefined);
     const visible = [...baseSlice];
     
