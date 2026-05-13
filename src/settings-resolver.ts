@@ -15,6 +15,7 @@ import { FLOW_TIERS,
 	selectFlowModelStrategy,
 	writeGlobalFlowMode,
 	formatFlowModelStrategy,
+	type GranularExcludeTools,
 	type LoadedFlowModelConfigs,
 } from "./config.js";
 import { getInheritedCliArgs } from "./cli-args.js";
@@ -37,7 +38,7 @@ export interface ResolvedSettings {
 	/** Per-tier concurrency limits. Effective cap is min(tier, maxConcurrency). */
 	tierConcurrency: { lite: number; flash: number; full: number };
 	defaultSessionMode: AgentSessionMode;
-	excludeTools: string[];
+	excludeTools: GranularExcludeTools | undefined;
 	discoveredFlows: FlowConfig[];
 	loadedFlowModelConfigs: LoadedFlowModelConfigs;
 	activeRuntimeFlowMode: string | undefined;
@@ -115,7 +116,7 @@ export function resolveSettings(
 	if (typeof flowSettings.maxConcurrency === "number") {
 		maxConcurrency = flowSettings.maxConcurrency;
 	}
-	const excludeTools: string[] = flowSettings.excludeTools ?? [];
+	const excludeTools: GranularExcludeTools | undefined = flowSettings.excludeTools;
 
 	// Resolve toolOptimize: CLI flag > env var > settings.json > default
 	const cliFlag = pi.getFlag("tool-optimize");
