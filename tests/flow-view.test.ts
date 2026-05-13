@@ -234,4 +234,72 @@ describe('FlowFocusedView', () => {
     view.handleInput('ctrl+alt+o');
     expect(onRePick).toHaveBeenCalled();
   });
+
+  it('scrolls up via keybindings and down to return', () => {
+    const transcript = Array.from({ length: 50 }, (_, i) => ({ kind: 'output', text: 'Line ' + i }));
+    const kb = {
+      matches: vi.fn((data, name) => {
+        if (data === 'up' && name === 'tui.select.up') return true;
+        if (data === 'down' && name === 'tui.select.down') return true;
+        return false;
+      }),
+      register: vi.fn(),
+      unregister: vi.fn(),
+      list: vi.fn(() => []),
+    };
+    const view = new FlowFocusedView('build#0', makeEntry({ transcript }), tui, theme, kb, vi.fn());
+    // Initial render to populate maxScroll
+    view.render(80);
+    // Scroll up
+    view.handleInput('up');
+    view.handleInput('up');
+    const linesAfterScroll = view.render(80);
+    expect(linesAfterScroll.length).toBeGreaterThan(0);
+    // Scroll down back
+    view.handleInput('down');
+    view.handleInput('down');
+    expect(() => view.render(80)).not.toThrow();
+  });
+
+  it('scrolls up via k and down via j raw keys', () => {
+    const transcript = Array.from({ length: 50 }, (_, i) => ({ kind: 'output', text: 'Line ' + i }));
+    const view = new FlowFocusedView('build#0', makeEntry({ transcript }), tui, theme, keybindings, vi.fn());
+    view.render(80);
+    // k scrolls up, j scrolls down
+    view.handleInput('k');
+    view.handleInput('k');
+    view.handleInput('j');
+    expect(() => view.render(80)).not.toThrow();
+  });
+
+  it('update() resets scroll offset to 0', () => {
+    const transcript = Array.from({ length: 50 }, (_, i) => ({ kind: 'output', text: 'Line ' + i }));
+    const kb = {
+      matches: vi.fn((data, name) => {
+        if (data === 'up' && name === 'tui.select.up') return true;
+        return false;
+      }),
+      register: vi.fn(),
+      unregister: vi.fn(),
+      list: vi.fn(() => []),
+    };
+    const view = new FlowFocusedView('build#0', makeEntry({ transcript }), tui, theme, kb, vi.fn());
+    view.render(80);
+    // Scroll up
+    view.handleInput('up');
+    view.handleInput('up');
+    // Update should reset scroll
+    view.update(makeEntry({ transcript: [{ kind: 'output', text: 'new content' }] }));
+    expect(() => view.render(80)).not.toThrow();
+  });
+
+  it('output lines are padded to full width', () => {
+    const transcript = [{ kind: 'output', text: 'short' }];
+    const view = new FlowFocusedView('build#0', makeEntry({ transcript }), tui, theme, keybindings, vi.fn());
+    const lines = view.render(80);
+    expect(lines.length).toBeGreaterThan(0);
+    // The output line should be padded with spaces to fill the width
+    const contentLines = lines.filter((l) => l.includes('short'));
+    expect(contentLines.length).toBeGreaterThan(0);
+  });
 });

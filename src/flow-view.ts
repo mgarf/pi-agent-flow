@@ -231,6 +231,8 @@ export class FlowFocusedView implements Component {
   private dismiss: () => void;
   private onRePick: (() => void) | undefined;
   private lastRenderWidth = 0;
+  private scrollOffset = 0;
+  private maxScroll = 0;
 
   constructor(
     flowKey: string,
@@ -254,6 +256,7 @@ export class FlowFocusedView implements Component {
   /** Update the transcript data and re-render. Called on every streaming delta. */
   update(entry: FlowOutputEntry): void {
     this.entry = entry;
+    this.scrollOffset = 0; // reset scroll so new output is always visible
     this.buildContent();
     this.container.invalidate();
   }
@@ -266,6 +269,24 @@ export class FlowFocusedView implements Component {
     // Ctrl+Alt+O to re-pick a different flow
     if (this.onRePick && matchesKey(data, "ctrl+alt+o")) {
       this.onRePick();
+      return;
+    }
+    // Scroll up
+    if (this.keybindings.matches(data, "tui.select.up") || matchesKey(data, "k")) {
+      if (this.scrollOffset < this.maxScroll) {
+        this.scrollOffset++;
+        this.buildContent();
+        this.container.invalidate();
+      }
+      return;
+    }
+    // Scroll down
+    if (this.keybindings.matches(data, "tui.select.down") || matchesKey(data, "j")) {
+      if (this.scrollOffset > 0) {
+        this.scrollOffset--;
+        this.buildContent();
+        this.container.invalidate();
+      }
       return;
     }
   }
@@ -307,7 +328,10 @@ export class FlowFocusedView implements Component {
         lines.push(this.theme.fg("dim", `  ${label}`));
       }
       const wrapped = wrapTextWithAnsi(text, width - 4);
-      lines.push(...wrapped.map((l) => `  ${colorFn(l)}`));
+      lines.push(...wrapped.map((l) => {
+        const colored = `  ${colorFn(l)}`;
+        return truncateToWidth(colored, width, " ", true);
+      }));
       lastKind = kind;
     };
 
@@ -319,8 +343,16 @@ export class FlowFocusedView implements Component {
     const overlayHeight = Math.floor(this.tui.terminal.rows * 0.85);
     const overhead = 5; // header + gap + possible error + trailing gap
     const maxRows = Math.max(1, overlayHeight - overhead);
-    const visible = lines.slice(-maxRows);
-    if (lines.length > maxRows) {
+    this.maxScroll = Math.max(0, lines.length - maxRows);
+    
+    // Apply scroll offset: slice from the scrolled position
+    const baseSlice = lines.slice(-(maxRows + this.scrollOffset), -this.scrollOffset || undefined);
+    const visible = [...baseSlice];
+    
+    // Show scroll indicator at top of transcript
+    if (this.scrollOffset > 0) {
+      visible.unshift(this.theme.fg("dim", `  ── Scrolled up ${this.scrollOffset} lines ──`));
+    } else if (lines.length > maxRows) {
       visible.unshift(this.theme.fg("dim", `  ... ${lines.length - maxRows} lines above ...`));
     }
 
@@ -351,7 +383,7 @@ export class FlowFocusedView implements Component {
     const topBorder = new BoxBorderTop(borderColor, this.entry.type, titleColor).render(width);
     const bottomBorder = new BoxBorderBottom(
       borderColor,
-      "Esc dismiss \u00b7 Ctrl+Alt+O re-pick",
+      "Esc dismiss \u00b7 \u2191\u2193 scroll \u00b7 Ctrl+Alt+O re-pick",
       (s: string) => this.theme.fg("dim", s),
     ).render(width);
 
