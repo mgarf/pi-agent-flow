@@ -407,7 +407,7 @@ export default function (pi: ExtensionAPI) {
 								}
 								tracked.lastThinking = sr.thinkingText;
 							}
-							if (sr.streamingText && !sr.thinkingText) {
+							if (sr.streamingText) {
 								const delta = sr.streamingText.slice(tracked.lastOutput.length);
 								if (delta.trim()) {
 									entry.transcript.push({ kind: "output" as const, text: delta });
