@@ -26,12 +26,6 @@ export interface LoadedFlowModelConfigs {
 	strategy: FlowModelStrategy;
 }
 
-export interface GranularExcludeTools {
-	optimize?: string[];
-	nonOptimize?: string[];
-	both?: string[];
-}
-
 export interface FlowSettings {
 	toolOptimize?: boolean;
 	/** Whether to inject structured JSON output instructions into flow prompts. Default: true. */
@@ -42,8 +36,8 @@ export interface FlowSettings {
 	/** Default child-flow session mode. Default: "default" (600s). */
 	sessionMode?: AgentSessionMode;
 
-	/** Granular tool exclusions per optimize mode. Keys: optimize, nonOptimize, both. */
-	excludeTools?: GranularExcludeTools;
+	/** Additional tools to exclude from the main agent session beyond the defaults (read, write, edit, batch). */
+	excludeTools?: string[];
 }
 
 const BUILTIN_FLOW_MODEL_CONFIGS: FlowModelConfigs = {
@@ -245,24 +239,15 @@ function extractFlowSettings(settings: Record<string, unknown> | null): FlowSett
 	}
 
 	const rawExcludeTools = obj.excludeTools;
-	if (rawExcludeTools !== undefined && isPlainObject(rawExcludeTools)) {
-		const granular: GranularExcludeTools = {};
-		for (const key of ["optimize", "nonOptimize", "both"] as const) {
-			const raw = rawExcludeTools[key];
-			if (Array.isArray(raw)) {
-				const filtered: string[] = [];
-				for (const item of raw) {
-					if (typeof item === "string" && item.trim()) {
-						filtered.push(item.trim());
-					}
-				}
-				if (filtered.length > 0) {
-					granular[key] = filtered;
-				}
+	if (Array.isArray(rawExcludeTools)) {
+		const filtered: string[] = [];
+		for (const item of rawExcludeTools) {
+			if (typeof item === "string" && item.trim()) {
+				filtered.push(item.trim());
 			}
 		}
-		if (Object.keys(granular).length > 0) {
-			result.excludeTools = granular;
+		if (filtered.length > 0) {
+			result.excludeTools = filtered;
 		}
 	}
 	return result;
