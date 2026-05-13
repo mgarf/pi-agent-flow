@@ -416,13 +416,18 @@ export default function (pi: ExtensionAPI) {
 							entry.running = sr.exitCode === -1;
 							if (sr.errorMessage) entry.errorMessage = sr.errorMessage;
 
-							// Delta tracking: only push new text, not the full accumulated text
+							// Delta tracking: accumulate into last same-kind entry so wrapping happens on full section text
 							const tracked = deltaTracker.get(key) ?? { lastThinking: "", lastOutput: "" };
 
 							if (sr.thinkingText) {
 								const delta = sr.thinkingText.slice(tracked.lastThinking.length);
 								if (delta.trim()) {
-									entry.transcript.push({ kind: "thinking" as const, text: delta });
+									const lastEntry = entry.transcript[entry.transcript.length - 1];
+									if (lastEntry && lastEntry.kind === "thinking") {
+										lastEntry.text += delta;
+									} else {
+										entry.transcript.push({ kind: "thinking" as const, text: delta });
+									}
 									writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "thinking", text: delta });
 								}
 								tracked.lastThinking = sr.thinkingText;
@@ -430,7 +435,12 @@ export default function (pi: ExtensionAPI) {
 							if (sr.streamingText) {
 								const delta = sr.streamingText.slice(tracked.lastOutput.length);
 								if (delta.trim()) {
-									entry.transcript.push({ kind: "output" as const, text: delta });
+									const lastEntry = entry.transcript[entry.transcript.length - 1];
+									if (lastEntry && lastEntry.kind === "output") {
+										lastEntry.text += delta;
+									} else {
+										entry.transcript.push({ kind: "output" as const, text: delta });
+									}
 									writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "output", text: delta });
 								}
 								tracked.lastOutput = sr.streamingText;
