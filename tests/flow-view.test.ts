@@ -39,7 +39,7 @@ vi.mock('@mariozechner/pi-tui', async (importOriginal) => {
 import { FlowPicker, FlowFocusedView, type FlowOutputEntry, type TranscriptEntry } from '../src/flow-view.js';
 
 function makeMockTheme() {
-  return { fg: (_, text) => text, bg: (_, text) => text };
+  return { fg: (_, text) => text, bg: (_, text) => text, bold: (text) => text };
 }
 
 function makeMockKeybindings() {
