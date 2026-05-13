@@ -42,7 +42,7 @@ const FLOW_TOOLS = new Set(["flow", "web", "ask_user"]);
 
 export function computeActiveTools(
 	existingTools: string[],
-	excludeTools: { optimize?: string[]; nonOptimize?: string[]; both?: string[] } | undefined,
+	excludeTools: string[],
 	optimize: boolean,
 ): string[] {
 	const excluded = new Set(ALWAYS_EXCLUDED);
@@ -52,13 +52,8 @@ export function computeActiveTools(
 		excluded.add("bash");
 	}
 
-	if (excludeTools) {
-		for (const t of excludeTools.both ?? []) excluded.add(t.toLowerCase());
-		if (optimize) {
-			for (const t of excludeTools.optimize ?? []) excluded.add(t.toLowerCase());
-		} else {
-			for (const t of excludeTools.nonOptimize ?? []) excluded.add(t.toLowerCase());
-		}
+	for (const t of excludeTools) {
+		excluded.add(t.toLowerCase());
 	}
 
 	const tools = new Set<string>();
