@@ -382,6 +382,12 @@ export default function (pi: ExtensionAPI) {
 				// Track per-flow outputs for TUI overlay consumption
 				const flowOutputs = new Map<string, FlowOutputEntry>();
 
+				// Track last-emitted text per flow key to compute deltas (avoid duplication)
+				const deltaTracker = new Map<string, { lastThinking: string; lastOutput: string }>();
+
+				// Reference to active flow view for live updates
+				let activeFlowView: { key: string; view: FlowFocusedView } | null = null;
+
 				// Create shared log directory for this flow tool invocation
 				const flowLogDir = createFlowLogDir();
 
@@ -409,17 +415,39 @@ export default function (pi: ExtensionAPI) {
 							}
 							entry.running = sr.exitCode === -1;
 							if (sr.errorMessage) entry.errorMessage = sr.errorMessage;
+
+							// Delta tracking: only push new text, not the full accumulated text
+							const tracked = deltaTracker.get(key) ?? { lastThinking: "", lastOutput: "" };
+
 							if (sr.thinkingText) {
-								entry.transcript.push({ kind: "thinking" as const, text: sr.thinkingText });
-								writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "thinking", text: sr.thinkingText });
+								const delta = sr.thinkingText.slice(tracked.lastThinking.length);
+								if (delta.trim()) {
+									entry.transcript.push({ kind: "thinking" as const, text: delta });
+									writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "thinking", text: delta });
+								}
+								tracked.lastThinking = sr.thinkingText;
 							}
 							if (sr.streamingText && !sr.thinkingText) {
-								entry.transcript.push({ kind: "output" as const, text: sr.streamingText });
-								writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "output", text: sr.streamingText });
+								const delta = sr.streamingText.slice(tracked.lastOutput.length);
+								if (delta.trim()) {
+									entry.transcript.push({ kind: "output" as const, text: delta });
+									writeFlowLogEntry(flowLogDir, sr.type || "unknown", i, { type: "output", text: delta });
+								}
+								tracked.lastOutput = sr.streamingText;
 							}
-							// Remove completed flows from the overlay map after all transcript/log operations
-							if (sr.exitCode !== -1) {
-								flowOutputs.delete(key);
+
+							// Populate streaming fields for live display
+							entry.streamingThinking = sr.thinkingText || "";
+							entry.streamingOutput = sr.streamingText || "";
+
+							deltaTracker.set(key, tracked);
+						}
+
+						// Live-update the active flow view if one is watching
+						if (activeFlowView) {
+							const entry = flowOutputs.get(activeFlowView.key);
+							if (entry) {
+								activeFlowView.view.update(entry);
 							}
 						}
 					}
@@ -466,15 +494,16 @@ export default function (pi: ExtensionAPI) {
 
 									// Show FlowFocusedView for selected flow
 									ctx.ui.custom(
-										(tui2: TUI, theme2: Theme, kb2: KeybindingsManager, done2: (key: string | null) => void) =>
-											new FlowFocusedView(
+										(tui2: TUI, theme2: Theme, kb2: KeybindingsManager, done2: (key: string | null) => void) => {
+											const view = new FlowFocusedView(
 												selectedKey,
 												selectedEntry,
 												tui2,
 												theme2,
 												kb2,
-												() => done2(null),
+												() => { activeFlowView = null; done2(null); },
 												() => {
+													activeFlowView = null;
 													done2(null);
 													// Re-show picker on Ctrl+O re-pick
 													const refreshedList: Array<{ key: string; type: string; aim: string; running: boolean }> = [];
@@ -489,8 +518,11 @@ export default function (pi: ExtensionAPI) {
 														);
 													}
 												},
-											),
-											overlayOpts,
+											);
+											activeFlowView = { key: selectedKey, view };
+											return view;
+										},
+										overlayOpts,
 									);
 								}),
 							overlayOpts,
