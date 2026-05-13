@@ -250,14 +250,15 @@ export class FlowFocusedView implements Component {
     this.keybindings = keybindings;
     this.dismiss = dismiss;
     this.onRePick = onRePick;
-    this.buildContent();
+    this.buildContent(Math.max(1, (process.stdout.columns ?? 80) - BOX_BORDER_OVERHEAD));
   }
 
   /** Update the transcript data and re-render. Called on every streaming delta. */
   update(entry: FlowOutputEntry): void {
     this.entry = entry;
     this.scrollOffset = 0; // reset scroll so new output is always visible
-    this.buildContent();
+    const w = this.lastRenderWidth || Math.max(1, (process.stdout.columns ?? 80) - BOX_BORDER_OVERHEAD);
+    this.buildContent(w);
     this.container.invalidate();
   }
 
@@ -275,7 +276,8 @@ export class FlowFocusedView implements Component {
     if (this.keybindings.matches(data, "tui.select.up") || matchesKey(data, "k")) {
       if (this.scrollOffset < this.maxScroll) {
         this.scrollOffset++;
-        this.buildContent();
+        const w = this.lastRenderWidth || Math.max(1, (process.stdout.columns ?? 80) - BOX_BORDER_OVERHEAD);
+        this.buildContent(w);
         this.container.invalidate();
       }
       return;
@@ -284,16 +286,17 @@ export class FlowFocusedView implements Component {
     if (this.keybindings.matches(data, "tui.select.down") || matchesKey(data, "j")) {
       if (this.scrollOffset > 0) {
         this.scrollOffset--;
-        this.buildContent();
+        const w = this.lastRenderWidth || Math.max(1, (process.stdout.columns ?? 80) - BOX_BORDER_OVERHEAD);
+        this.buildContent(w);
         this.container.invalidate();
       }
       return;
     }
   }
 
-  private buildContent(): void {
+  private buildContent(renderWidth: number): void {
     this.container.clear();
-    const width = this.lastRenderWidth || (process.stdout.columns ?? 80);
+    const width = renderWidth;
 
     const borderColor = (s: string) => this.theme.fg("accent", s);
     const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
@@ -311,7 +314,7 @@ export class FlowFocusedView implements Component {
 
     // Build full transcript (completed entries + streaming)
     const lines: string[] = [];
-    const separator = this.theme.fg("dim", "─".repeat(width - 4));
+    const separator = this.theme.fg("dim", "─".repeat(Math.max(0, width - 2)));
 
     // Group thinking and output into sections for cleaner rendering
     let lastKind: "thinking" | "output" | null = null;
@@ -327,10 +330,10 @@ export class FlowFocusedView implements Component {
         }
         lines.push(this.theme.fg("dim", `  ${label}`));
       }
-      const wrapped = wrapTextWithAnsi(text, width - 4);
+      const wrapped = wrapTextWithAnsi(text, Math.max(1, width - 2));
       lines.push(...wrapped.map((l) => {
         const colored = `  ${colorFn(l)}`;
-        return truncateToWidth(colored, width, " ", true);
+        return truncateToWidth(colored, width - 2, " ", true);
       }));
       lastKind = kind;
     };
@@ -341,12 +344,15 @@ export class FlowFocusedView implements Component {
 
     // Auto-scroll: show last N lines that fit the overlay
     const overlayHeight = Math.floor(this.tui.terminal.rows * 0.85);
-    const overhead = 5; // header + gap + possible error + trailing gap
-    const maxRows = Math.max(1, overlayHeight - overhead);
+    const errorOverhead = this.entry.errorMessage ? 2 : 0;
+    const maxRows = Math.max(1, overlayHeight - 5 - errorOverhead);
     this.maxScroll = Math.max(0, lines.length - maxRows);
     
     // Apply scroll offset: slice from the scrolled position
-    const baseSlice = lines.slice(-(maxRows + this.scrollOffset), -this.scrollOffset || undefined);
+    // Reserve 1 row for scroll indicator when scrolled, so slice maxRows - 1
+    const indicatorSpace = this.scrollOffset > 0 ? 1 : 0;
+    const sliceCount = Math.max(1, maxRows - indicatorSpace);
+    const baseSlice = lines.slice(-(sliceCount + this.scrollOffset), -this.scrollOffset || undefined);
     const visible = [...baseSlice];
     
     // Show scroll indicator at top of transcript
@@ -356,7 +362,10 @@ export class FlowFocusedView implements Component {
       visible.unshift(this.theme.fg("dim", `  ... ${lines.length - maxRows} lines above ...`));
     }
 
-    for (const line of visible) {
+    // Clamp visible lines to maxRows to prevent screen clipping
+    const clamped = visible.slice(0, maxRows);
+    
+    for (const line of clamped) {
       this.container.addChild(new Text(line, 0, 0));
     }
 
@@ -374,6 +383,8 @@ export class FlowFocusedView implements Component {
   render(width: number): string[] {
     const innerWidth = Math.max(1, width - BOX_BORDER_OVERHEAD);
     this.lastRenderWidth = innerWidth;
+
+    this.buildContent(innerWidth);
 
     const rawLines = this.container.render(innerWidth);
 
