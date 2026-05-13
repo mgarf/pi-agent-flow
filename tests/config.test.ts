@@ -306,14 +306,11 @@ describe("loadFlowSettings", () => {
 
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-agent-flow-config-test-"));
-		originalHome = process.env.HOME;
 		originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-		process.env.HOME = tmpDir;
-		delete process.env.PI_CODING_AGENT_DIR;
+		process.env.PI_CODING_AGENT_DIR = path.join(tmpDir, ".pi", "agent");
 	});
 
 	afterEach(() => {
-		process.env.HOME = originalHome;
 		if (originalAgentDir !== undefined) {
 			process.env.PI_CODING_AGENT_DIR = originalAgentDir;
 		} else {
@@ -423,6 +420,100 @@ describe("loadFlowSettings", () => {
 		});
 		const result = loadFlowSettings(tmpDir);
 		expect(result).toEqual({});
+	});
+
+	it("reads granular excludeTools with both key", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: {
+					both: ["find", "grep"],
+				},
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toEqual({ both: ["find", "grep"] });
+	});
+
+	it("reads granular excludeTools with optimize key", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: {
+					optimize: ["bash"],
+				},
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toEqual({ optimize: ["bash"] });
+	});
+
+	it("reads granular excludeTools with nonOptimize key", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: {
+					nonOptimize: ["web"],
+				},
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toEqual({ nonOptimize: ["web"] });
+	});
+
+	it("reads granular excludeTools with all keys combined", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: {
+					both: ["find"],
+					optimize: ["bash"],
+					nonOptimize: ["web"],
+				},
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toEqual({ both: ["find"], optimize: ["bash"], nonOptimize: ["web"] });
+	});
+
+	it("trims whitespace in excludeTools entries", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: {
+					both: ["  find  ", "grep "],
+				},
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toEqual({ both: ["find", "grep"] });
+	});
+
+	it("ignores non-string entries in excludeTools arrays", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: {
+					both: ["find", 123, null, "grep"],
+				},
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toEqual({ both: ["find", "grep"] });
+	});
+
+	it("ignores empty excludeTools object", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: {},
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toBeUndefined();
+	});
+
+	it("ignores old-style array excludeTools", () => {
+		writeGlobalSettings({
+			flowSettings: {
+				excludeTools: ["find", "grep"],
+			},
+		});
+		const result = loadFlowSettings(tmpDir);
+		expect(result.excludeTools).toBeUndefined();
 	});
 });
 

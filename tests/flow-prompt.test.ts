@@ -62,7 +62,7 @@ describe("computeActiveTools", () => {
   });
 
   it("respects user-configured excludeTools", () => {
-    const result = computeActiveTools(baseExisting, ["bash", "find"], true);
+    const result = computeActiveTools(baseExisting, { both: ["bash", "find"] }, true);
     expect(result).not.toContain("bash");
     expect(result).not.toContain("find");
     // Other tools still present
@@ -71,7 +71,7 @@ describe("computeActiveTools", () => {
   });
 
   it("excludeTools is case-insensitive", () => {
-    const result = computeActiveTools(baseExisting, ["BASH", "Find"], true);
+    const result = computeActiveTools(baseExisting, { both: ["BASH", "Find"] }, true);
     expect(result).not.toContain("bash");
     expect(result).not.toContain("find");
   });
@@ -88,5 +88,96 @@ describe("computeActiveTools", () => {
     const result = computeActiveTools(baseExisting, [], true);
     expect(result.filter((t) => t === "flow")).toHaveLength(1);
     expect(result.filter((t) => t === "web")).toHaveLength(1);
+  });
+});
+
+describe("computeActiveTools granular exclusions", () => {
+  const baseExisting = [
+    "read",
+    "write",
+    "edit",
+    "bash",
+    "find",
+    "grep",
+    "ls",
+    "flow",
+    "web",
+    "memory",
+    "memory_search",
+  ];
+
+  it("excludes tools in both mode regardless of optimize", () => {
+    const resultOpt = computeActiveTools(baseExisting, { both: ["find"] }, true);
+    expect(resultOpt).not.toContain("find");
+    const resultNonOpt = computeActiveTools(baseExisting, { both: ["find"] }, false);
+    expect(resultNonOpt).not.toContain("find");
+  });
+
+  it("excludes optimize-only tools only in optimize mode", () => {
+    const resultOpt = computeActiveTools(baseExisting, { optimize: ["grep"] }, true);
+    expect(resultOpt).not.toContain("grep");
+    const resultNonOpt = computeActiveTools(baseExisting, { optimize: ["grep"] }, false);
+    expect(resultNonOpt).toContain("grep");
+  });
+
+  it("excludes nonOptimize-only tools only in non-optimize mode", () => {
+    const resultOpt = computeActiveTools(baseExisting, { nonOptimize: ["ls"] }, true);
+    expect(resultOpt).toContain("ls");
+    const resultNonOpt = computeActiveTools(baseExisting, { nonOptimize: ["ls"] }, false);
+    expect(resultNonOpt).not.toContain("ls");
+  });
+
+  it("combines both, optimize, and nonOptimize exclusions correctly", () => {
+    const resultOpt = computeActiveTools(baseExisting, {
+      both: ["find"],
+      optimize: ["grep"],
+      nonOptimize: ["ls"],
+    }, true);
+    expect(resultOpt).not.toContain("find");
+    expect(resultOpt).not.toContain("grep");
+    expect(resultOpt).toContain("ls");
+
+    const resultNonOpt = computeActiveTools(baseExisting, {
+      both: ["find"],
+      optimize: ["grep"],
+      nonOptimize: ["ls"],
+    }, false);
+    expect(resultNonOpt).not.toContain("find");
+    expect(resultNonOpt).toContain("grep");
+    expect(resultNonOpt).not.toContain("ls");
+  });
+
+  it("handles undefined excludeTools", () => {
+    const result = computeActiveTools(baseExisting, undefined, false);
+    expect(result).toContain("bash");
+    expect(result).toContain("find");
+    expect(result).toContain("grep");
+  });
+
+  it("handles empty object excludeTools", () => {
+    const result = computeActiveTools(baseExisting, {}, false);
+    expect(result).toContain("bash");
+    expect(result).toContain("find");
+    expect(result).toContain("grep");
+  });
+
+  it("handles partial object (only optimize key)", () => {
+    const resultOpt = computeActiveTools(baseExisting, { optimize: ["find"] }, true);
+    expect(resultOpt).not.toContain("find");
+    const resultNonOpt = computeActiveTools(baseExisting, { optimize: ["find"] }, false);
+    expect(resultNonOpt).toContain("find");
+  });
+
+  it("handles partial object (only both key)", () => {
+    const resultOpt = computeActiveTools(baseExisting, { both: ["find"] }, true);
+    expect(resultOpt).not.toContain("find");
+    const resultNonOpt = computeActiveTools(baseExisting, { both: ["find"] }, false);
+    expect(resultNonOpt).not.toContain("find");
+  });
+
+  it("is case-insensitive for granular exclusions", () => {
+    const result = computeActiveTools(baseExisting, { both: ["FIND", "Grep"] }, true);
+    expect(result).not.toContain("find");
+    expect(result).not.toContain("grep");
   });
 });
