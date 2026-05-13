@@ -1246,7 +1246,7 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalled();
 		const calledWith = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(calledWith).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(calledWith).toEqual(["batch_read", "flow", "web", "ask_user", "memory_search", "session_search", "memory", "skill"]);
 	});
 
 	it("restores legacy read+write+edit+batch when toolOptimize is false", async () => {
@@ -1297,7 +1297,7 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalledTimes(afterSession + 1);
 		const lastCall = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls.at(-1)[0];
-		expect(lastCall).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(lastCall).toEqual(["batch_read", "flow", "web", "ask_user", "memory_search", "session_search", "memory", "skill"]);
 	});
 
 	it("restores legacy+batch tools on turn_start when toolOptimize is false", async () => {
@@ -1332,7 +1332,7 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalled();
 		const calledWith = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(calledWith).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(calledWith).toEqual(["batch_read", "flow", "web", "ask_user", "memory_search", "session_search", "memory", "skill"]);
 	});
 
 	it("registers batch_read for main agent; batch/batch_bash_poll reserved for children", async () => {
@@ -1351,7 +1351,7 @@ describe("main agent tool restriction", () => {
 
 		// Main agent active tools: batch_read + flow + web + ask_user (batch and batch_bash_poll registered but not active)
 		const lastCall = pi.setActiveTools.mock.calls[pi.setActiveTools.mock.calls.length - 1][0];
-		expect(lastCall).toEqual(["batch_read", "flow", "web", "ask_user"]);
+		expect(lastCall).toEqual(["batch_read", "flow", "web", "ask_user", "memory_search", "session_search", "memory", "skill"]);
 	});
 
 	it("does NOT override active tools for child flows (depth > 0)", async () => {
