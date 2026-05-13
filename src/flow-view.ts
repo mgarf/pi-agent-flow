@@ -233,6 +233,9 @@ export class FlowFocusedView implements Component {
   private lastRenderWidth = 0;
   private scrollOffset = 0;
   private maxScroll = 0;
+  private scrollState: "none" | "scrolled" | "overflow" = "none";
+  private scrollCount = 0;
+  private firstTranscriptLineIndex = 0;
 
   constructor(
     flowKey: string,
@@ -333,7 +336,7 @@ export class FlowFocusedView implements Component {
       const wrapped = wrapTextWithAnsi(text, Math.max(1, width - 2));
       lines.push(...wrapped.map((l) => {
         const colored = `  ${colorFn(l)}`;
-        return truncateToWidth(colored, width, " ", true);
+        return truncateToWidth(colored, width, "", true);
       }));
       lastKind = kind;
     };
@@ -349,20 +352,25 @@ export class FlowFocusedView implements Component {
     this.maxScroll = Math.max(0, lines.length - maxRows);
     
     // Apply scroll offset: slice from the scrolled position
-    // Reserve 1 row for scroll indicator when scrolled, so slice maxRows - 1
-    const indicatorSpace = this.scrollOffset > 0 ? 1 : 0;
-    const linesAboveVisible = (lines.length > maxRows && this.scrollOffset === 0) ? 1 : 0;
-    const reservedLines = indicatorSpace + linesAboveVisible;
-    const sliceCount = Math.max(1, maxRows - reservedLines);
+    const sliceCount = Math.max(1, maxRows);
     const baseSlice = lines.slice(-(sliceCount + this.scrollOffset), -this.scrollOffset || undefined);
     const visible = [...baseSlice];
     
-    // Show scroll indicator at top of transcript
+    // Track scroll state for left-border scrollbar indicator (zero vertical space)
     if (this.scrollOffset > 0) {
-      visible.unshift(this.theme.fg("dim", `  ── Scrolled up ${this.scrollOffset} lines ──`));
+      this.scrollState = "scrolled";
+      this.scrollCount = this.scrollOffset;
     } else if (lines.length > maxRows) {
-      visible.unshift(this.theme.fg("dim", `  ... ${lines.length - maxRows} lines above ...`));
+      this.scrollState = "overflow";
+      this.scrollCount = lines.length - maxRows;
+    } else {
+      this.scrollState = "none";
+      this.scrollCount = 0;
     }
+    
+    // Track first transcript line index for scrollbar border indicator
+    // Container children: header(1) + aim(1 if present) + spacer(1) + transcript...
+    this.firstTranscriptLineIndex = 2 + (this.entry.aim ? 1 : 0);
 
     // Clamp visible lines to maxRows to prevent screen clipping
     const clamped = visible.slice(0, maxRows);
@@ -394,15 +402,24 @@ export class FlowFocusedView implements Component {
     const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
 
     const topBorder = new BoxBorderTop(borderColor, this.entry.type, titleColor).render(width);
+    const scrollPrefix = this.scrollState !== "none"
+      ? `${this.scrollState === "scrolled" ? "\u25b2" : "\u25bc"} ${this.scrollCount} \u00b7 `
+      : "";
     const bottomBorder = new BoxBorderBottom(
       borderColor,
-      "Esc dismiss \u00b7 \u2191\u2193 scroll \u00b7 Ctrl+Alt+O re-pick",
+      `${scrollPrefix}Esc dismiss \u00b7 \u2191\u2193 scroll \u00b7 Ctrl+Alt+O re-pick`,
       (s: string) => this.theme.fg("dim", s),
     ).render(width);
 
-    const contentLines = rawLines.map((line) => {
+    const contentLines = rawLines.map((line, index) => {
       const padded = truncateToWidth(line, innerWidth, "", true);
-      return `${borderColor(BOX_BORDER_LEFT)}${padded}${borderColor(BOX_BORDER_RIGHT)}`;
+      let leftBorder = BOX_BORDER_LEFT;
+      // Left-border scrollbar: show arrow on first transcript line when scrolled
+      if (index === this.firstTranscriptLineIndex && this.scrollState !== "none") {
+        const arrow = this.scrollState === "scrolled" ? "\u25b2" : "\u25bc";
+        leftBorder = `${arrow} `;
+      }
+      return `${borderColor(leftBorder)}${padded}${borderColor(BOX_BORDER_RIGHT)}`;
     });
 
     return [...topBorder, ...contentLines, ...bottomBorder];
