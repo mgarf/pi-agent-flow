@@ -50,6 +50,68 @@ export interface FlowOutputEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Box border rendering (mirrors ask-user.ts)
+// ---------------------------------------------------------------------------
+
+const BOX_BORDER_LEFT = "\u2502 ";
+const BOX_BORDER_RIGHT = " \u2502";
+const BOX_BORDER_OVERHEAD = BOX_BORDER_LEFT.length + BOX_BORDER_RIGHT.length;
+
+class BoxBorderTop implements Component {
+  private color: (s: string) => string;
+  private title?: string;
+  private titleColor?: (s: string) => string;
+
+  constructor(color: (s: string) => string, title?: string, titleColor?: (s: string) => string) {
+    this.color = color;
+    this.title = title;
+    this.titleColor = titleColor;
+  }
+
+  invalidate(): void { /* no-op */ }
+
+  render(width: number): string[] {
+    const inner = Math.max(0, width - 2);
+    if (!this.title || inner < this.title.length + 4) {
+      return [this.color("\u256d" + "\u2500".repeat(inner) + "\u256e")];
+    }
+    const label = " " + this.title + " ";
+    const remaining = inner - 1 - label.length;
+    const titleStyle = this.titleColor ?? this.color;
+    return [
+      this.color("\u256d\u2500") + titleStyle(label) + this.color("\u2500".repeat(Math.max(0, remaining)) + "\u256e"),
+    ];
+  }
+}
+
+class BoxBorderBottom implements Component {
+  private color: (s: string) => string;
+  private label?: string;
+  private labelColor?: (s: string) => string;
+
+  constructor(color: (s: string) => string, label?: string, labelColor?: (s: string) => string) {
+    this.color = color;
+    this.label = label;
+    this.labelColor = labelColor;
+  }
+
+  invalidate(): void { /* no-op */ }
+
+  render(width: number): string[] {
+    const inner = Math.max(0, width - 2);
+    if (!this.label || inner < this.label.length + 4) {
+      return [this.color("\u2570" + "\u2500".repeat(inner) + "\u256f")];
+    }
+    const tag = " " + this.label + " ";
+    const leftDashes = inner - tag.length - 1;
+    const style = this.labelColor ?? this.color;
+    return [
+      this.color("\u2570" + "\u2500".repeat(Math.max(0, leftDashes))) + style(tag) + this.color("\u2500\u256f"),
+    ];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // FlowPicker — select a flow to watch
 // ---------------------------------------------------------------------------
 
@@ -104,10 +166,11 @@ export class FlowPicker implements Component {
     this.container.clear();
     const width = process.stdout.columns ?? 80;
 
-    // Title
-    this.container.addChild(
-      new Text(this.theme.fg("accent", "  Select a flow to watch"), 0, 0),
-    );
+    const borderColor = (s: string) => this.theme.fg("accent", s);
+    const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
+
+    // Top border
+    this.container.addChild(new BoxBorderTop(borderColor, "flow_picker", titleColor));
     this.container.addChild(new Spacer(1));
 
     for (let i = 0; i < this.flows.length; i++) {
@@ -122,8 +185,9 @@ export class FlowPicker implements Component {
     }
 
     this.container.addChild(new Spacer(1));
+    // Bottom border
     this.container.addChild(
-      new Text(this.theme.fg("dim", "  \u2191\u2193 navigate \u00b7 Enter select \u00b7 Esc dismiss"), 0, 0),
+      new BoxBorderBottom(borderColor, "Esc dismiss", (s: string) => this.theme.fg("dim", s)),
     );
   }
 
@@ -133,7 +197,23 @@ export class FlowPicker implements Component {
 
   render(width: number): string[] {
     this.buildContent();
-    return this.container.render(width);
+
+    const innerWidth = Math.max(1, width - BOX_BORDER_OVERHEAD);
+    const rawLines = this.container.render(innerWidth);
+
+    const borderColor = (s: string) => this.theme.fg("accent", s);
+    const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
+
+    return rawLines.map((line, index) => {
+      if (index === 0) {
+        return new BoxBorderTop(borderColor, "flow_picker", titleColor).render(width)[0];
+      }
+      if (index === rawLines.length - 1) {
+        return new BoxBorderBottom(borderColor, "Esc dismiss", (s: string) => this.theme.fg("dim", s)).render(width)[0];
+      }
+      const padded = truncateToWidth(line, innerWidth, "", true);
+      return `${borderColor(BOX_BORDER_LEFT)}${padded}${borderColor(BOX_BORDER_RIGHT)}`;
+    });
   }
 }
 
@@ -193,6 +273,13 @@ export class FlowFocusedView implements Component {
     this.container.clear();
     const width = process.stdout.columns ?? 80;
 
+    const borderColor = (s: string) => this.theme.fg("accent", s);
+    const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
+
+    // Top border with flow type as title
+    this.container.addChild(new BoxBorderTop(borderColor, this.entry.type, titleColor));
+    this.container.addChild(new Spacer(1));
+
     // Header
     const statusLabel = this.entry.running
       ? this.theme.fg("warning", "\u25cf running")
@@ -229,7 +316,7 @@ export class FlowFocusedView implements Component {
     }
 
     // Auto-scroll: show last N lines that fit the terminal
-    const maxRows = Math.max(1, this.tui.terminal.rows - 6); // header + footer, clamped to avoid negative
+    const maxRows = Math.max(1, this.tui.terminal.rows - 6);
     const visible = lines.slice(-maxRows);
     if (lines.length > maxRows) {
       visible.unshift(this.theme.fg("dim", `  ... ${lines.length - maxRows} lines above ...`));
@@ -246,8 +333,13 @@ export class FlowFocusedView implements Component {
     }
 
     this.container.addChild(new Spacer(1));
+    // Bottom border
     this.container.addChild(
-      new Text(this.theme.fg("dim", "  Esc dismiss \u00b7 Ctrl+Alt+O re-pick"), 0, 0),
+      new BoxBorderBottom(
+        borderColor,
+        "Esc dismiss \u00b7 Ctrl+Alt+O re-pick",
+        (s: string) => this.theme.fg("dim", s),
+      ),
     );
   }
 
@@ -257,6 +349,26 @@ export class FlowFocusedView implements Component {
 
   render(width: number): string[] {
     this.buildContent();
-    return this.container.render(width);
+
+    const innerWidth = Math.max(1, width - BOX_BORDER_OVERHEAD);
+    const rawLines = this.container.render(innerWidth);
+
+    const borderColor = (s: string) => this.theme.fg("accent", s);
+    const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
+
+    return rawLines.map((line, index) => {
+      if (index === 0) {
+        return new BoxBorderTop(borderColor, this.entry.type, titleColor).render(width)[0];
+      }
+      if (index === rawLines.length - 1) {
+        return new BoxBorderBottom(
+          borderColor,
+          "Esc dismiss \u00b7 Ctrl+Alt+O re-pick",
+          (s: string) => this.theme.fg("dim", s),
+        ).render(width)[0];
+      }
+      const padded = truncateToWidth(line, innerWidth, "", true);
+      return `${borderColor(BOX_BORDER_LEFT)}${padded}${borderColor(BOX_BORDER_RIGHT)}`;
+    });
   }
 }
