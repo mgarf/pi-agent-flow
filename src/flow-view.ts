@@ -230,6 +230,7 @@ export class FlowFocusedView implements Component {
   private keybindings: KeybindingsManager;
   private dismiss: () => void;
   private onRePick: (() => void) | undefined;
+  private lastRenderWidth = 0;
 
   constructor(
     flowKey: string,
@@ -271,14 +272,10 @@ export class FlowFocusedView implements Component {
 
   private buildContent(): void {
     this.container.clear();
-    const width = process.stdout.columns ?? 80;
+    const width = this.lastRenderWidth || (process.stdout.columns ?? 80);
 
     const borderColor = (s: string) => this.theme.fg("accent", s);
     const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
-
-    // Top border with flow type as title
-    this.container.addChild(new BoxBorderTop(borderColor, this.entry.type, titleColor));
-    this.container.addChild(new Spacer(1));
 
     // Header
     const statusLabel = this.entry.running
@@ -318,18 +315,10 @@ export class FlowFocusedView implements Component {
       pushEntry(entry.kind, entry.text);
     }
 
-    // Append incomplete streaming thinking
-    if (this.entry.streamingThinking) {
-      pushEntry("thinking", this.entry.streamingThinking);
-    }
-
-    // Append incomplete streaming output
-    if (this.entry.streamingOutput) {
-      pushEntry("output", this.entry.streamingOutput);
-    }
-
-    // Auto-scroll: show last N lines that fit the terminal
-    const maxRows = Math.max(1, this.tui.terminal.rows - 6);
+    // Auto-scroll: show last N lines that fit the overlay
+    const overlayHeight = Math.floor(this.tui.terminal.rows * 0.85);
+    const overhead = 5; // header + gap + possible error + trailing gap
+    const maxRows = Math.max(1, overlayHeight - overhead);
     const visible = lines.slice(-maxRows);
     if (lines.length > maxRows) {
       visible.unshift(this.theme.fg("dim", `  ... ${lines.length - maxRows} lines above ...`));
@@ -341,19 +330,9 @@ export class FlowFocusedView implements Component {
 
     // Error message
     if (this.entry.errorMessage) {
-      this.container.addChild(new Spacer(1));
+      this.container.addChild(new Text("", 0, 0));
       this.container.addChild(new Text(this.theme.fg("error", `  Error: ${this.entry.errorMessage}`), 0, 0));
     }
-
-    this.container.addChild(new Spacer(1));
-    // Bottom border
-    this.container.addChild(
-      new BoxBorderBottom(
-        borderColor,
-        "Esc dismiss \u00b7 Ctrl+Alt+O re-pick",
-        (s: string) => this.theme.fg("dim", s),
-      ),
-    );
   }
 
   invalidate(): void {
@@ -361,27 +340,26 @@ export class FlowFocusedView implements Component {
   }
 
   render(width: number): string[] {
-    this.buildContent();
-
     const innerWidth = Math.max(1, width - BOX_BORDER_OVERHEAD);
+    this.lastRenderWidth = innerWidth;
+
     const rawLines = this.container.render(innerWidth);
 
     const borderColor = (s: string) => this.theme.fg("accent", s);
     const titleColor = (s: string) => this.theme.fg("dim", this.theme.bold(s));
 
-    return rawLines.map((line, index) => {
-      if (index === 0) {
-        return new BoxBorderTop(borderColor, this.entry.type, titleColor).render(width)[0];
-      }
-      if (index === rawLines.length - 1) {
-        return new BoxBorderBottom(
-          borderColor,
-          "Esc dismiss \u00b7 Ctrl+Alt+O re-pick",
-          (s: string) => this.theme.fg("dim", s),
-        ).render(width)[0];
-      }
+    const topBorder = new BoxBorderTop(borderColor, this.entry.type, titleColor).render(width);
+    const bottomBorder = new BoxBorderBottom(
+      borderColor,
+      "Esc dismiss \u00b7 Ctrl+Alt+O re-pick",
+      (s: string) => this.theme.fg("dim", s),
+    ).render(width);
+
+    const contentLines = rawLines.map((line) => {
       const padded = truncateToWidth(line, innerWidth, "", true);
       return `${borderColor(BOX_BORDER_LEFT)}${padded}${borderColor(BOX_BORDER_RIGHT)}`;
     });
+
+    return [...topBorder, ...contentLines, ...bottomBorder];
   }
 }
