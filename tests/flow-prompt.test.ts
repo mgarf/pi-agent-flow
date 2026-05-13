@@ -17,7 +17,7 @@ describe("computeActiveTools", () => {
   ];
 
   it("excludes always-excluded tools (read, write, edit, batch)", () => {
-    const result = computeActiveTools(baseExisting, [], true);
+    const result = computeActiveTools(baseExisting, undefined, true);
     expect(result).not.toContain("read");
     expect(result).not.toContain("write");
     expect(result).not.toContain("edit");
@@ -25,7 +25,7 @@ describe("computeActiveTools", () => {
   });
 
   it("excludes bash in optimize mode", () => {
-    const result = computeActiveTools(baseExisting, [], true);
+    const result = computeActiveTools(baseExisting, undefined, true);
     expect(result).not.toContain("bash");
     // Other non-mutation tools still present
     expect(result).toContain("find");
@@ -36,7 +36,7 @@ describe("computeActiveTools", () => {
   });
 
   it("includes bash in non-optimize mode", () => {
-    const result = computeActiveTools(baseExisting, [], false);
+    const result = computeActiveTools(baseExisting, undefined, false);
     expect(result).toContain("bash");
     expect(result).toContain("find");
     expect(result).toContain("grep");
@@ -45,24 +45,24 @@ describe("computeActiveTools", () => {
 
 
   it("always adds flow tools (flow, web, ask_user)", () => {
-    const result = computeActiveTools([], [], true);
+    const result = computeActiveTools([], undefined, true);
     expect(result).toContain("flow");
     expect(result).toContain("web");
     expect(result).toContain("ask_user");
   });
 
   it("adds batch_read in optimize mode", () => {
-    const result = computeActiveTools(baseExisting, [], true);
+    const result = computeActiveTools(baseExisting, undefined, true);
     expect(result).toContain("batch_read");
   });
 
   it("does not add batch_read in non-optimize mode", () => {
-    const result = computeActiveTools(baseExisting, [], false);
+    const result = computeActiveTools(baseExisting, undefined, false);
     expect(result).not.toContain("batch_read");
   });
 
   it("respects user-configured excludeTools", () => {
-    const result = computeActiveTools(baseExisting, ["bash", "find"], true);
+    const result = computeActiveTools(baseExisting, { both: ["find"], optimize: ["bash"] }, true);
     expect(result).not.toContain("bash");
     expect(result).not.toContain("find");
     // Other tools still present
@@ -71,13 +71,13 @@ describe("computeActiveTools", () => {
   });
 
   it("excludeTools is case-insensitive", () => {
-    const result = computeActiveTools(baseExisting, ["BASH", "Find"], true);
+    const result = computeActiveTools(baseExisting, { both: ["Find"], optimize: ["BASH"] }, true);
     expect(result).not.toContain("bash");
     expect(result).not.toContain("find");
   });
 
   it("returns sorted unique array", () => {
-    const result = computeActiveTools(baseExisting, [], true);
+    const result = computeActiveTools(baseExisting, undefined, true);
     const sorted = [...result].sort();
     expect(result).toEqual(sorted);
     expect(result).toHaveLength(new Set(result).size);
@@ -85,7 +85,7 @@ describe("computeActiveTools", () => {
 
   it("deduplicates tools already in existingTools", () => {
     // flow and web are already in baseExisting
-    const result = computeActiveTools(baseExisting, [], true);
+    const result = computeActiveTools(baseExisting, undefined, true);
     expect(result.filter((t) => t === "flow")).toHaveLength(1);
     expect(result.filter((t) => t === "web")).toHaveLength(1);
   });

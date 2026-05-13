@@ -16,6 +16,7 @@ import {
 	writeGlobalFlowMode,
 	formatFlowModelStrategy,
 	type LoadedFlowModelConfigs,
+	type ExcludeToolsConfig,
 } from "./config.js";
 import { getInheritedCliArgs } from "./cli-args.js";
 import { parseBoolean, FLOW_TOOL_OPTIMIZE_ENV } from "./depth.js";
@@ -35,7 +36,7 @@ export interface ResolvedSettings {
 	structuredOutput: boolean;
 	maxConcurrency: number;
 	defaultSessionMode: AgentSessionMode;
-	excludeTools: string[];
+	excludeTools: ExcludeToolsConfig | undefined;
 	discoveredFlows: FlowConfig[];
 	loadedFlowModelConfigs: LoadedFlowModelConfigs;
 	activeRuntimeFlowMode: string | undefined;
@@ -113,7 +114,7 @@ export function resolveSettings(
 	if (typeof flowSettings.maxConcurrency === "number") {
 		maxConcurrency = flowSettings.maxConcurrency;
 	}
-	const excludeTools: string[] = flowSettings.excludeTools ?? [];
+	const excludeTools: ExcludeToolsConfig | undefined = flowSettings.excludeTools;
 
 	// Resolve toolOptimize: CLI flag > env var > settings.json > default
 	const cliFlag = pi.getFlag("tool-optimize");

@@ -10,6 +10,7 @@ import {
 	looksLikeWebSearchPrompt,
 } from "./web-tool.js";
 import type { FlowDepthConfig } from "./depth.js";
+import type { ExcludeToolsConfig } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,7 +43,7 @@ const FLOW_TOOLS = new Set(["flow", "web", "ask_user"]);
 
 export function computeActiveTools(
 	existingTools: string[],
-	excludeTools: string[],
+	excludeTools: ExcludeToolsConfig | undefined,
 	optimize: boolean,
 ): string[] {
 	const excluded = new Set(ALWAYS_EXCLUDED);
@@ -52,8 +53,20 @@ export function computeActiveTools(
 		excluded.add("bash");
 	}
 
-	for (const t of excludeTools) {
-		excluded.add(t.toLowerCase());
+	// Resolve granular excludeTools
+	if (excludeTools) {
+		for (const t of excludeTools.both ?? []) {
+			excluded.add(t.toLowerCase());
+		}
+		if (optimize) {
+			for (const t of excludeTools.optimize ?? []) {
+				excluded.add(t.toLowerCase());
+			}
+		} else {
+			for (const t of excludeTools.nonOptimize ?? []) {
+				excluded.add(t.toLowerCase());
+			}
+		}
 	}
 
 	const tools = new Set<string>();
