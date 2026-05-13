@@ -293,26 +293,39 @@ export class FlowFocusedView implements Component {
 
     // Build full transcript (completed entries + streaming)
     const lines: string[] = [];
-    for (const entry of this.entry.transcript) {
-      if (entry.kind === "thinking") {
-        const wrapped = wrapTextWithAnsi(entry.text, width - 4);
-        lines.push(...wrapped.map((l) => `  ${this.theme.fg("dim", l)}`));
-      } else {
-        const wrapped = wrapTextWithAnsi(entry.text, width - 4);
-        lines.push(...wrapped.map((l) => `  ${l}`));
+    const separator = this.theme.fg("dim", "─".repeat(width - 4));
+
+    // Group thinking and output into sections for cleaner rendering
+    let lastKind: "thinking" | "output" | null = null;
+
+    const pushEntry = (kind: "thinking" | "output", text: string) => {
+      if (!text) return;
+      const colorFn = kind === "thinking" ? (s: string) => this.theme.fg("dim", s) : (s: string) => s;
+      const label = kind === "thinking" ? "[thinking]" : "[output]";
+      // Add section header when switching kinds
+      if (lastKind !== kind) {
+        if (lines.length > 0) {
+          lines.push(separator);
+        }
+        lines.push(this.theme.fg("dim", `  ${label}`));
       }
+      const wrapped = wrapTextWithAnsi(text, width - 4);
+      lines.push(...wrapped.map((l) => `  ${colorFn(l)}`));
+      lastKind = kind;
+    };
+
+    for (const entry of this.entry.transcript) {
+      pushEntry(entry.kind, entry.text);
     }
 
     // Append incomplete streaming thinking
     if (this.entry.streamingThinking) {
-      const wrapped = wrapTextWithAnsi(this.entry.streamingThinking, width - 4);
-      lines.push(...wrapped.map((l) => `  ${this.theme.fg("dim", l)}`));
+      pushEntry("thinking", this.entry.streamingThinking);
     }
 
     // Append incomplete streaming output
     if (this.entry.streamingOutput) {
-      const wrapped = wrapTextWithAnsi(this.entry.streamingOutput, width - 4);
-      lines.push(...wrapped.map((l) => `  ${l}`));
+      pushEntry("output", this.entry.streamingOutput);
     }
 
     // Auto-scroll: show last N lines that fit the terminal
