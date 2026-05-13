@@ -1250,7 +1250,7 @@ describe("main agent tool restriction", () => {
 
 		expect(pi.setActiveTools).toHaveBeenCalled();
 		const calledWith = (pi.setActiveTools as ReturnType<typeof vi.fn>).mock.calls[0][0];
-		expect(calledWith).toContain("bash");
+		expect(calledWith).not.toContain("bash");
 		expect(calledWith).toContain("find");
 		expect(calledWith).toContain("grep");
 		expect(calledWith).toContain("ls");

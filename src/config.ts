@@ -26,6 +26,16 @@ export interface LoadedFlowModelConfigs {
 	strategy: FlowModelStrategy;
 }
 
+/** Granular exclude-tools configuration scoped by optimize mode. */
+export interface ExcludeToolsConfig {
+	/** Tools excluded in both optimize and non-optimize modes. */
+	both?: string[];
+	/** Tools excluded only when toolOptimize is true. */
+	optimize?: string[];
+	/** Tools excluded only when toolOptimize is false. */
+	nonOptimize?: string[];
+}
+
 export interface FlowSettings {
 	toolOptimize?: boolean;
 	/** Whether to inject structured JSON output instructions into flow prompts. Default: true. */
@@ -44,8 +54,8 @@ export interface FlowSettings {
 		full?: number;
 	};
 
-	/** Granular tool exclusions per optimize mode. Keys: optimize, nonOptimize, both. */
-	excludeTools?: GranularExcludeTools;
+	/** Granular tools to exclude from child sessions beyond the defaults (read, write, edit, batch). */
+	excludeTools?: ExcludeToolsConfig;
 }
 
 const BUILTIN_FLOW_MODEL_CONFIGS: FlowModelConfigs = {
@@ -261,17 +271,27 @@ function extractFlowSettings(settings: Record<string, unknown> | null): FlowSett
 		}
 	}
 
-
+	// Parse granular excludeTools: { both?, optimize?, nonOptimize? }
 	const rawExcludeTools = obj.excludeTools;
-	if (Array.isArray(rawExcludeTools)) {
-		const filtered: string[] = [];
-		for (const item of rawExcludeTools) {
-			if (typeof item === "string" && item.trim()) {
-				filtered.push(item.trim());
+	if (rawExcludeTools !== undefined && isPlainObject(rawExcludeTools) && !Array.isArray(rawExcludeTools)) {
+		const excludeObj = rawExcludeTools as Record<string, unknown>;
+		const config: ExcludeToolsConfig = {};
+		for (const key of ["both", "optimize", "nonOptimize"]) {
+			const arr = excludeObj[key];
+			if (Array.isArray(arr) && arr.length > 0) {
+				const filtered: string[] = [];
+				for (const item of arr) {
+					if (typeof item === "string" && item.trim()) {
+						filtered.push(item.trim());
+					}
+				}
+				if (filtered.length > 0) {
+					config[key as keyof ExcludeToolsConfig] = filtered;
+				}
 			}
 		}
-		if (filtered.length > 0) {
-			result.excludeTools = filtered;
+		if (Object.keys(config).length > 0) {
+			result.excludeTools = config;
 		}
 	}
 	return result;
