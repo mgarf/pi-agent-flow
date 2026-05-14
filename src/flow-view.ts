@@ -18,7 +18,10 @@ import {
   type TUI,
   truncateToWidth,
   wrapTextWithAnsi,
+  Markdown,
 } from "@mariozechner/pi-tui";
+import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
+import { italic, tailText } from "./render-utils.js";
 
 // ---------------------------------------------------------------------------
 // Transcript entry
@@ -349,7 +352,6 @@ export class FlowFocusedView implements Component {
 
     const pushEntry = (kind: "thinking" | "output", text: string) => {
       if (!text) return;
-      const colorFn = kind === "thinking" ? (s: string) => this.theme.fg("dim", s) : (s: string) => s;
       const label = kind === "thinking" ? "[thinking]" : "[output]";
       // Add section header when switching kinds
       if (lastKind !== kind) {
@@ -358,9 +360,16 @@ export class FlowFocusedView implements Component {
         }
         lines.push(this.theme.fg("dim", `  ${label}`));
       }
-      const wrapped = wrapTextWithAnsi(text, Math.max(1, width - 2));
+      // Use tailText for long streaming text (matching main session)
+      const displayText = text.length > 2000 ? tailText(text, 2000) : text;
+      const wrapped = wrapTextWithAnsi(displayText, Math.max(1, width - 2));
       lines.push(...wrapped.map((l) => {
-        const colored = `  ${colorFn(l)}`;
+        if (kind === "thinking") {
+          // Thinking: dim + italic (matching main session streaming style)
+          const colored = `  ${this.theme.fg("dim", italic(l))}`;
+          return truncateToWidth(colored, width, "", true);
+        }
+        const colored = `  ${l}`;
         return truncateToWidth(colored, width, "", true);
       }));
       lastKind = kind;
