@@ -47,6 +47,8 @@ export interface FlowOutputEntry {
   streamingOutput: string;
   /** Error message if flow failed. */
   errorMessage?: string;
+  /** Structured output parsed from the flow's final response. */
+  structuredOutput?: import("./types.js").FlowStructuredOutput;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +111,11 @@ class BoxBorderBottom implements Component {
       this.color("\u2570" + "\u2500".repeat(Math.max(0, leftDashes))) + style(tag) + this.color("\u2500\u256f"),
     ];
   }
+}
+
+/** Strip ```json ... ``` code blocks from text. */
+function stripJsonBlock(text: string): string {
+  return text.replace(/```(?:json)?\s*[\s\S]*?```/g, "").trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +266,24 @@ export class FlowFocusedView implements Component {
   /** Update the transcript data and re-render. Called on every streaming delta. */
   update(entry: FlowOutputEntry): void {
     this.entry = entry;
+
+    // Strip JSON code blocks from transcript when structured output is available
+    // so the overlay shows the formatted report instead of raw JSON.
+    if (entry.structuredOutput && entry.transcript.length > 0) {
+      let changed = false;
+      for (const t of entry.transcript) {
+        const stripped = stripJsonBlock(t.text);
+        if (stripped !== t.text) {
+          t.text = stripped;
+          changed = true;
+        }
+      }
+      if (changed) {
+        // Reset scroll since content changed
+        this.scrollOffset = 0;
+      }
+    }
+
     this.scrollOffset = 0; // reset scroll so new output is always visible
     const w = this.lastRenderWidth || Math.max(1, (process.stdout.columns ?? 80) - BOX_BORDER_OVERHEAD);
     this.buildContent(w);
@@ -343,6 +368,76 @@ export class FlowFocusedView implements Component {
 
     for (const entry of this.entry.transcript) {
       pushEntry(entry.kind, entry.text);
+    }
+
+    // Structured output report (only when flow is done and structured output is available)
+    if (!this.entry.running && this.entry.structuredOutput) {
+      const so = this.entry.structuredOutput;
+
+      lines.push(separator);
+      lines.push(this.theme.fg("dim", "  [report]"));
+
+      // Status badge + summary
+      const statusColor = so.status === "complete" ? "success" : so.status === "partial" ? "warning" : "error";
+      lines.push(`  ${this.theme.fg(statusColor, `[${so.status}]`)} ${truncateToWidth(so.summary, Math.max(1, width - 10), "", true)}`);
+
+      // Files
+      if (so.files && so.files.length > 0) {
+        const fileList = so.files.slice(0, 10).map((f) => f.path).join(", ");
+        lines.push(this.theme.fg("dim", `  Files: ${truncateToWidth(fileList, Math.max(1, width - 10), "", true)}`));
+      }
+
+      // Commands
+      if (so.commands && so.commands.length > 0) {
+        const cmdLabels = so.commands.slice(0, 5).map((c) => {
+          const short = c.command.length > 40 ? c.command.slice(0, 40) + "..." : c.command;
+          return `${c.tool ?? "cmd"}: ${short}`;
+        });
+        lines.push(this.theme.fg("dim", `  Commands: ${cmdLabels.join(", ")}`));
+        if (so.commands.length > 5) {
+          lines.push(this.theme.fg("dim", `    ... and ${so.commands.length - 5} more`));
+        }
+      }
+
+      // Not done
+      if (so.notDone && so.notDone.length > 0) {
+        const notDoneText = so.notDone.map((item) => {
+          const details = [
+            item.reason ? `reason: ${item.reason}` : undefined,
+            item.blocker ? `blocker: ${item.blocker}` : undefined,
+            item.nextStep ? `next: ${item.nextStep}` : undefined,
+          ].filter(Boolean).join("; ");
+          return details ? `${item.item} (${details})` : item.item;
+        }).join("; ");
+        lines.push(this.theme.fg("dim", `  Not Done: ${truncateToWidth(notDoneText, Math.max(1, width - 14), "", true)}`));
+      }
+
+      // Next steps
+      if (so.nextSteps && so.nextSteps.length > 0) {
+        lines.push(this.theme.fg("dim", `  Next: ${truncateToWidth(so.nextSteps.join("; "), Math.max(1, width - 10), "", true)}`));
+      }
+
+      // Reasoning (top 3)
+      if (so.reasoning && so.reasoning.length > 0) {
+        for (const r of so.reasoning.slice(0, 3)) {
+          const short = r.length > 80 ? r.slice(0, 80) + "..." : r;
+          lines.push(this.theme.fg("dim", `    \u2022 ${truncateToWidth(short, Math.max(1, width - 8), "", true)}`));
+        }
+        if (so.reasoning.length > 3) {
+          lines.push(this.theme.fg("dim", `    ... and ${so.reasoning.length - 3} more`));
+        }
+      }
+
+      // Notes (top 3)
+      if (so.notes && so.notes.length > 0) {
+        for (const n of so.notes.slice(0, 3)) {
+          const short = n.length > 80 ? n.slice(0, 80) + "..." : n;
+          lines.push(this.theme.fg("dim", `    \u2022 ${truncateToWidth(short, Math.max(1, width - 8), "", true)}`));
+        }
+        if (so.notes.length > 3) {
+          lines.push(this.theme.fg("dim", `    ... and ${so.notes.length - 3} more`));
+        }
+      }
     }
 
     // Auto-scroll: show last N lines that fit the overlay
